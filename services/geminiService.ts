@@ -5,7 +5,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Fast & Spontaneous Analysis
 export const evaluateHandSign = async (
-  imageBase64: string, 
+  imageBase64: string,
   targetSign: string,
   targetDescription: string,
   signType: 'static' | 'dynamic' = 'static'
@@ -23,9 +23,9 @@ export const evaluateHandSign = async (
       Task:
       1. Analyze the hand shape, finger positioning, and orientation in the image.
       2. Compare it specifically against the "Expected Visual Description" provided above.
-      3. ${signType === 'dynamic' 
-          ? 'For this DYNAMIC sign (movement), accept the STARTING handshape, ENDING handshape, or the KEY handshape of the motion as correct. Be lenient on motion blur.' 
-          : 'For this STATIC sign, be STRICT on specific finger placement and orientation.'}
+      3. ${signType === 'dynamic'
+        ? 'For this DYNAMIC sign (movement), accept the STARTING handshape, ENDING handshape, or the KEY handshape of the motion as correct. Be lenient on motion blur.'
+        : 'For this STATIC sign, be STRICT on specific finger placement and orientation.'}
       
       Return a JSON object:
       { 
@@ -114,15 +114,15 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
     if (!text) return [];
 
     const rawData = JSON.parse(text);
-    
+
     // Map to Lesson interface
     return rawData.map((item: any, index: number) => {
       // Smart Image Selection
       let imageUrl = `https://placehold.co/400x400/27272a/FFFFFF/png?text=${encodeURIComponent(item.sign)}&font=roboto`;
-      
+
       // If it is a single letter, use the stable Wikimedia URL
       if (item.sign.length === 1 && /^[A-Za-z]$/.test(item.sign)) {
-         imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/Sign_language_${item.sign.toUpperCase()}.svg?width=500`;
+        imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/Sign_language_${item.sign.toUpperCase()}.svg?width=500`;
       }
 
       return {
@@ -132,7 +132,7 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
         letter: item.sign,
         description: item.description,
         instruction: item.instruction,
-        imageUrl: imageUrl, 
+        imageUrl: imageUrl,
         difficulty: item.difficulty
       };
     });

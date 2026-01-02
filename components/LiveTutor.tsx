@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
-import { Mic, MicOff, Sparkles, X, Video, VideoOff, Loader2, Volume2, StopCircle, Info, Camera, MessageSquareText, Check } from 'lucide-react';
+import { Mic, MicOff, Sparkles, X, Video, VideoOff, Loader2, Volume2, StopCircle, Info, Camera, MessageSquareText, Check, AlertTriangle, RefreshCw } from 'lucide-react';
 import { HandTrackingRef } from './HandTrackingCanvas';
 import { FeedbackResponse } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -66,10 +66,10 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
   const [isActive, setIsActive] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [volume, setVolume] = useState(0);
   const [agentSpeaking, setAgentSpeaking] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const activeRef = useRef(false);
   const inputContextRef = useRef<AudioContext | null>(null);
@@ -86,6 +86,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
       setIsActive(false);
     } else {
       setIsActive(true);
+      setError(null);
       // Connection handled by effect
     }
   };
@@ -97,17 +98,26 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
 
   const connect = async () => {
     if (activeRef.current) return;
+
+    // Check API Key immediately
+    if (!process.env.API_KEY || process.env.API_KEY === 'mock-key') {
+      setError("Invalid API Key");
+      setIsActive(true); // Keep UI active to show error
+      return;
+    }
+
     activeRef.current = true;
     audioStreamingEnabledRef.current = false; // Reset streaming gate
+    setError(null);
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      
+
       inputContextRef.current = inputCtx;
       outputContextRef.current = outputCtx;
-      
+
       // Ensure contexts are running (handling autoplay policies)
       try {
         if (inputCtx.state === 'suspended') await inputCtx.resume();
@@ -117,7 +127,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
+
       const config = {
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
@@ -132,8 +142,10 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
           PROTOCOL:
           1. As soon as you connect, you MUST SPEAK FIRST. Do not wait for the user.
           2. Say exactly: "Welcome! Let's practice the sign for ${lessonSign}. ${lessonDescription}"
-          3. Then pause and wait for the user to try it.
-          4. Be encouraging and concise.`,
+          3. I (The System) will send you "SYSTEM NOTIFICATIONS" when the user performs a sign.
+          4. When you receive a notification that the user SUCCEEDED, immediately congratulate them.
+          5. When you receive a notification that the user FAILED, I will give you the specific error. You must immediately explain how to fix it.
+          6. Keep all responses concise and encouraging.`,
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
@@ -147,103 +159,113 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
           onopen: () => {
             console.log('Gemini Live Socket Opened');
             setIsConnected(true);
-            
+            setError(null);
+
             // HACK: Send a tiny silent audio frame to "wake" the model and trigger the turn
-            // This ensures the model processes the system instruction "Speak First" immediately
             try {
-                const silentData = new Float32Array(1024).fill(0);
-                const pcmBlob = createBlob(silentData);
-                sessionPromise.then(session => {
-                    session.sendRealtimeInput({ media: pcmBlob });
-                });
+              const silentData = new Float32Array(1024).fill(0);
+              const pcmBlob = createBlob(silentData);
+              sessionPromise.then(session => {
+                session.sendRealtimeInput({ media: pcmBlob });
+              });
             } catch (e) { console.warn("Wake signal failed", e); }
           },
           onmessage: async (msg: LiveServerMessage) => {
             if (!activeRef.current) return;
             const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audioData && outputContextRef.current) {
-                setAgentSpeaking(true);
-                const ctx = outputContextRef.current;
-                try {
-                    const buffer = await decodeAudioData(decodeBase64(audioData), ctx);
-                    const source = ctx.createBufferSource();
-                    source.buffer = buffer;
-                    source.connect(ctx.destination);
-                    const now = ctx.currentTime;
-                    // Prevent overlap but ensure low latency
-                    nextStartTimeRef.current = Math.max(nextStartTimeRef.current, now);
-                    source.start(nextStartTimeRef.current);
-                    nextStartTimeRef.current += buffer.duration;
-                    
-                    // Reset speaking state estimate
-                    setTimeout(() => setAgentSpeaking(false), buffer.duration * 1000);
-                } catch (e) {
-                    console.error("Audio decode error", e);
-                }
+              setAgentSpeaking(true);
+              const ctx = outputContextRef.current;
+              try {
+                const buffer = await decodeAudioData(decodeBase64(audioData), ctx);
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(ctx.destination);
+                const now = ctx.currentTime;
+                // Prevent overlap but ensure low latency
+                nextStartTimeRef.current = Math.max(nextStartTimeRef.current, now);
+                source.start(nextStartTimeRef.current);
+                nextStartTimeRef.current += buffer.duration;
+
+                // Reset speaking state estimate
+                setTimeout(() => setAgentSpeaking(false), buffer.duration * 1000);
+              } catch (e) {
+                console.error("Audio decode error", e);
+              }
             }
           },
-          onclose: () => { 
-            console.log("Gemini Live Socket Closed");
-            setIsConnected(false); 
+          onclose: (e) => {
+            console.log("Gemini Live Socket Closed", e);
+            setIsConnected(false);
+            // Only set error if it wasn't a manual disconnect
+            if (activeRef.current) {
+              setError("Connection Closed");
+            }
           },
-          onerror: (err) => { 
-            // Often "Network Error" happens on close or bad state, we can log it as warn
-            console.warn("Gemini Live Session Error:", err);
+          onerror: (err: any) => {
+            console.error("Gemini Live Session Error:", err);
+            setIsConnected(false);
+            // Attempt to extract meaningful error
+            const msg = err.message || err.toString();
+            if (msg.includes("403")) setError("Invalid API Key");
+            else if (msg.includes("404")) setError("Model Not Found");
+            else setError("Connection Failed");
           }
         }
       });
-      
+
       // Store session reference when resolved
       sessionPromise.then(session => {
         if (!activeRef.current) {
-            session.close();
-            return;
+          session.close();
+          return;
         }
         sessionRef.current = session;
-        
+
         console.log("Session connected. Waiting to enable audio...");
-        
+
         // 1.0s delay prevents user ambient noise from interrupting the Model's Intro
         setTimeout(() => {
-            if (activeRef.current) {
-                audioStreamingEnabledRef.current = true;
-                console.log("Audio input enabled");
-            }
+          if (activeRef.current) {
+            audioStreamingEnabledRef.current = true;
+            console.log("Audio input enabled");
+          }
         }, 1000);
 
       }).catch(err => {
         console.error("Failed to connect:", err);
         setIsConnected(false);
         activeRef.current = false;
+        setError("Connection Failed");
       });
 
       // --- Setup Audio Input Stream ---
       const source = inputCtx.createMediaStreamSource(stream);
       const processor = inputCtx.createScriptProcessor(4096, 1, 1);
-      
+
       processor.onaudioprocess = (e) => {
         // Gate audio input with audioStreamingEnabledRef
         if (!activeRef.current || isMuted || !audioStreamingEnabledRef.current) return;
-        
+
         const inputData = e.inputBuffer.getChannelData(0);
-        
+
         // Calculate volume for UI
         let sum = 0;
-        for(let i=0; i<inputData.length; i++) sum += inputData[i] * inputData[i];
+        for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i];
         setVolume(Math.sqrt(sum / inputData.length) * 5);
-        
+
         const pcmBlob = createBlob(inputData);
-        
+
         sessionPromise.then(async (session) => {
-             if (activeRef.current && sessionRef.current === session) {
-                try {
-                    // Explicitly await and catch to prevent unhandled promise rejections which cause "Network Error"
-                    await session.sendRealtimeInput({ media: pcmBlob });
-                } catch(e) {
-                    // Ignore send errors which happen if socket closes mid-stream
-                }
-             }
-        }).catch(() => {});
+          if (activeRef.current && sessionRef.current === session) {
+            try {
+              // Explicitly await and catch to prevent unhandled promise rejections which cause "Network Error"
+              await session.sendRealtimeInput({ media: pcmBlob });
+            } catch (e) {
+              // Ignore send errors which happen if socket closes mid-stream
+            }
+          }
+        }).catch(() => { });
       };
       source.connect(processor);
       processor.connect(inputCtx.destination);
@@ -251,28 +273,29 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
       // --- Setup Video Stream ---
       if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
       videoIntervalRef.current = window.setInterval(() => {
-          // Gate video input as well to prevent interruption
-          if (!activeRef.current || !isVideoEnabled || !audioStreamingEnabledRef.current) return;
-          
-          const snapshot = canvasRef.current?.getSnapshot();
-          if (snapshot) {
-              const base64Data = snapshot.split(',')[1];
-              sessionPromise.then(async (session) => {
-                  if (activeRef.current && sessionRef.current === session) {
-                    try {
-                        await session.sendRealtimeInput({
-                            media: { mimeType: 'image/jpeg', data: base64Data }
-                        });
-                    } catch(e) {}
-                  }
-              }).catch(() => {});
-          }
+        // Gate video input as well to prevent interruption
+        if (!activeRef.current || !audioStreamingEnabledRef.current) return;
+
+        const snapshot = canvasRef.current?.getSnapshot();
+        if (snapshot) {
+          const base64Data = snapshot.split(',')[1];
+          sessionPromise.then(async (session) => {
+            if (activeRef.current && sessionRef.current === session) {
+              try {
+                await session.sendRealtimeInput({
+                  media: { mimeType: 'image/jpeg', data: base64Data }
+                });
+              } catch (e) { }
+            }
+          }).catch(() => { });
+        }
       }, 500);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Connection setup failed", error);
       setIsConnected(false);
       activeRef.current = false;
+      setError(error.message || "Init Failed");
     }
   };
 
@@ -280,30 +303,30 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
     activeRef.current = false;
     audioStreamingEnabledRef.current = false;
     setIsConnected(false);
-    
+
     // Close audio contexts to release hardware
     if (inputContextRef.current) {
-        inputContextRef.current.close().catch(console.error);
-        inputContextRef.current = null;
+      inputContextRef.current.close().catch(console.error);
+      inputContextRef.current = null;
     }
     if (outputContextRef.current) {
-        outputContextRef.current.close().catch(console.error);
-        outputContextRef.current = null;
+      outputContextRef.current.close().catch(console.error);
+      outputContextRef.current = null;
     }
 
     if (videoIntervalRef.current) {
-        clearInterval(videoIntervalRef.current);
-        videoIntervalRef.current = null;
+      clearInterval(videoIntervalRef.current);
+      videoIntervalRef.current = null;
     }
-    
+
     // Properly close the Gemini session
     if (sessionRef.current) {
-        try {
-            sessionRef.current.close();
-        } catch (e) {
-            console.error("Error closing session:", e);
-        }
-        sessionRef.current = null;
+      try {
+        sessionRef.current.close();
+      } catch (e) {
+        console.error("Error closing session:", e);
+      }
+      sessionRef.current = null;
     }
   };
 
@@ -316,193 +339,224 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
     }
 
     if (isActive) {
-        connect();
+      connect();
     }
     return () => { disconnect(); };
   }, []); // Run once on mount
 
   // 2. Handle Reconnect if User Toggles back on
   useEffect(() => {
-     if (isActive && !activeRef.current) {
-         connect();
-     }
-  }, [isActive]);
+    if (isActive && !activeRef.current && !error) {
+      connect();
+    }
+  }, [isActive, error]);
 
   // 3. Handle Lesson Change (Reconnect with new context)
   useEffect(() => {
-      if (isActive && lessonSign !== prevSignRef.current) {
-          prevSignRef.current = lessonSign;
-          disconnect();
-          // Small buffer to allow cleanup
-          setTimeout(() => { if (isActive) connect(); }, 500);
-      }
+    if (isActive && lessonSign !== prevSignRef.current) {
+      prevSignRef.current = lessonSign;
+      disconnect();
+      // Small buffer to allow cleanup
+      setTimeout(() => { if (isActive) connect(); }, 500);
+    }
   }, [lessonSign, isActive]);
 
-  // 4. Handle Feedback Injection
+  // 4. Handle Feedback Injection (Auto-Speak)
   useEffect(() => {
     if (activeRef.current && sessionRef.current && feedback) {
-        const text = feedback.isCorrect 
-            ? `SYSTEM UPDATE: The user successfully performed the sign "${lessonSign}". Congratulate them warmly!` 
-            : `SYSTEM UPDATE: The user failed the sign "${lessonSign}". The error detected is: "${feedback.feedback}". Please explain this correction to them helpfuly.`;
+      // Construct a direct instruction to the model to speak immediately
+      const prompt = feedback.isCorrect
+        ? `[SYSTEM NOTIFICATION]: The user just COMPLETED the sign "${lessonSign}" CORRECTLY. \n\nACTION REQUIRED: Immediately speak to the user. Congratulate them enthusiastically on getting it right. Keep it brief (1 sentence).`
+        : `[SYSTEM NOTIFICATION]: The user just attempted the sign "${lessonSign}" but made a MISTAKE. \n\nError Analysis: "${feedback.feedback}". \n\nACTION REQUIRED: Immediately speak to the user. Do not say "System notification". Directly address the user and explain exactly how to fix their hand shape based on the Error Analysis above. Be helpful and encouraging.`;
 
-        try {
-            // We attempt to send a text turn to the model to guide its speech
-            // Note: The specific method to send text in a live session depends on the exact SDK version behavior,
-            // but 'send' with content parts is the standard pattern for GenAI sessions.
-            if (typeof sessionRef.current.send === 'function') {
-                sessionRef.current.send({ parts: [{ text }] });
-            } else {
-                 // Fallback if 'send' isn't directly exposed on the session object
-                console.log("Sending feedback via realtime input text injection");
-                // Some versions allow text in sendRealtimeInput contents
-                sessionRef.current.sendRealtimeInput([{ text }]);
-            }
-        } catch(e) {
-            console.warn("Failed to send feedback text to Gemini Live:", e);
-        }
+      // CRITICAL: Temporarily pause microphone input stream to ensuring the model processes
+      // the text event as a distinct "User Turn" without ambient noise or VAD keeping the turn open.
+      audioStreamingEnabledRef.current = false;
+
+      try {
+        console.log("Triggering AI Tutor Feedback:", feedback.isCorrect ? "Success" : "Correction");
+        // Sending text in a Live session triggers the model to respond
+        sessionRef.current.send({ parts: [{ text: prompt }] }, true);
+      } catch (e) {
+        console.warn("Failed to send feedback text to Gemini Live:", e);
+      }
+
+      // Re-enable mic after a delay to allow model to start speaking
+      setTimeout(() => {
+        if (activeRef.current) audioStreamingEnabledRef.current = true;
+      }, 3000);
     }
   }, [feedback, lessonSign]);
 
+  const handleRetry = () => {
+    setError(null);
+    setIsActive(true);
+    connect();
+  };
+
   return (
     <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
-      
+
       {/* Tutorial Overlay */}
       <AnimatePresence>
-        {showTutorial && isActive && (
+        {showTutorial && isActive && !error && (
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute bottom-full mb-6 w-80 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl z-50"
+            className="absolute bottom-full mb-6 w-80 bg-white dark:bg-zinc-900/95 backdrop-blur-xl border border-zinc-200 dark:border-white/10 rounded-2xl p-5 shadow-2xl z-50"
           >
-             <div className="flex items-center gap-2 mb-3">
-               <div className="p-1.5 bg-blue-500/20 rounded-lg">
-                 <Info className="w-4 h-4 text-blue-400" />
-               </div>
-               <h3 className="text-sm font-bold text-white">Meet your AI Tutor</h3>
-             </div>
-             
-             <ul className="space-y-3 mb-4">
-               <li className="flex items-start gap-3 text-xs text-zinc-300">
-                  <Camera className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
-                  <span>
-                    <strong className="text-zinc-100">I can see you.</strong> The camera tracks your hands to give real-time feedback on your form.
-                  </span>
-               </li>
-               <li className="flex items-start gap-3 text-xs text-zinc-300">
-                  <MessageSquareText className="w-4 h-4 text-zinc-500 shrink-0 mt-0.5" />
-                  <span>
-                    <strong className="text-zinc-100">I can hear you.</strong> Ask questions like "Is my thumb correct?" or "Can you repeat that?".
-                  </span>
-               </li>
-             </ul>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="p-1.5 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg">
+                <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Meet your AI Tutor</h3>
+            </div>
 
-             <button 
-               onClick={handleDismissTutorial}
-               className="w-full py-2 bg-white text-black font-bold text-xs rounded-lg hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2"
-             >
-               Got it
-               <Check className="w-3 h-3" />
-             </button>
-             
-             {/* Arrow pointer */}
-             <div className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-zinc-900 border-b border-r border-white/10 rotate-45"></div>
+            <ul className="space-y-3 mb-4">
+              <li className="flex items-start gap-3 text-xs text-zinc-600 dark:text-zinc-300">
+                <Camera className="w-4 h-4 text-zinc-400 dark:text-zinc-500 shrink-0 mt-0.5" />
+                <span>
+                  <strong className="text-zinc-900 dark:text-zinc-100">I can see you.</strong> The camera tracks your hands to give real-time feedback on your form.
+                </span>
+              </li>
+              <li className="flex items-start gap-3 text-xs text-zinc-600 dark:text-zinc-300">
+                <MessageSquareText className="w-4 h-4 text-zinc-400 dark:text-zinc-500 shrink-0 mt-0.5" />
+                <span>
+                  <strong className="text-zinc-900 dark:text-zinc-100">I can hear you.</strong> Ask questions like "Is my thumb correct?" or "Can you repeat that?".
+                </span>
+              </li>
+            </ul>
+
+            <button
+              onClick={handleDismissTutorial}
+              className="w-full py-2 bg-zinc-900 dark:bg-white text-white dark:text-black font-bold text-xs rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2"
+            >
+              Got it
+              <Check className="w-3 h-3" />
+            </button>
+
+            {/* Arrow pointer */}
+            <div className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-white dark:bg-zinc-900 border-b border-r border-zinc-200 dark:border-white/10 rotate-45"></div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence mode="wait">
         {!isActive ? (
-          <motion.button 
+          <motion.button
             key="inactive"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8 }}
             onClick={toggleActive}
-            className="flex items-center gap-3 px-6 py-3 bg-zinc-900/90 dark:bg-white/90 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl hover:scale-105 transition-all group"
+            className="flex items-center gap-3 px-6 py-3 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl border border-zinc-200 dark:border-white/10 rounded-full shadow-2xl hover:scale-105 transition-all group"
           >
             <div className="relative">
-                <Sparkles className="w-5 h-5 text-zinc-100 dark:text-zinc-900" />
-                <div className="absolute inset-0 bg-blue-500 blur-lg opacity-20 group-hover:opacity-40 transition-opacity" />
+              <Sparkles className="w-5 h-5 text-zinc-900 dark:text-zinc-100" />
+              <div className="absolute inset-0 bg-blue-500 blur-lg opacity-10 dark:opacity-20 group-hover:opacity-30 transition-opacity" />
             </div>
-            <span className="font-semibold text-sm text-zinc-100 dark:text-zinc-900">Enable AI Tutor</span>
+            <span className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">Enable AI Tutor</span>
           </motion.button>
         ) : (
-          <motion.div 
+          <motion.div
             key="active"
             initial={{ width: 60, height: 60, borderRadius: 30 }}
-            animate={{ 
-                width: isConnected ? 320 : 200, 
-                height: 64,
-                borderRadius: 32 
+            animate={{
+              width: isConnected ? 320 : (error ? 260 : 200),
+              height: 64,
+              borderRadius: 32,
+              backgroundColor: error ? 'rgba(239, 68, 68, 0.9)' : undefined
             }}
             exit={{ width: 60, opacity: 0 }}
-            className="bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex items-center justify-between px-2 overflow-hidden relative"
+            className={`backdrop-blur-2xl border flex items-center justify-between px-2 overflow-hidden relative shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition-colors duration-500 ${error
+                ? 'bg-red-500/90 border-red-400/50'
+                : 'bg-white/90 dark:bg-[#0a0a0a]/90 border-zinc-200 dark:border-white/10'
+              }`}
           >
             {/* Background Glow */}
-            <div className={`absolute inset-0 transition-opacity duration-1000 ${agentSpeaking ? 'opacity-30' : 'opacity-0'} bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 blur-xl`} />
+            {!error && <div className={`absolute inset-0 transition-opacity duration-1000 ${agentSpeaking ? 'opacity-30' : 'opacity-0'} bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 blur-xl`} />}
 
             {/* Content Container */}
             <div className="flex items-center gap-4 w-full px-2 z-10">
-                
-                {/* Status Indicator / Waveform */}
-                <div className="flex items-center justify-center w-10 h-10 shrink-0">
-                    {!isConnected ? (
-                        <Loader2 className="w-5 h-5 text-zinc-500 animate-spin" />
-                    ) : (
-                        <div className="flex items-center gap-1 h-4">
-                             {/* Dynamic Waveform */}
-                             {[...Array(5)].map((_, i) => (
-                                <div 
-                                    key={i} 
-                                    className="w-1 bg-white rounded-full transition-all duration-75"
-                                    style={{ 
-                                        height: `${Math.max(4, Math.min(24, 4 + (Math.random() * ((agentSpeaking ? 1 : volume) * 30))))}px`,
-                                        opacity: agentSpeaking ? 0.8 : (volume > 0.1 ? 0.8 : 0.3)
-                                    }}
-                                />
-                             ))}
-                        </div>
-                    )}
+
+              {/* Status Indicator / Waveform / Error Icon */}
+              <div className="flex items-center justify-center w-10 h-10 shrink-0">
+                {error ? (
+                  <AlertTriangle className="w-5 h-5 text-white animate-pulse" />
+                ) : !isConnected ? (
+                  <Loader2 className="w-5 h-5 text-zinc-500 animate-spin" />
+                ) : (
+                  <div className="flex items-center gap-1 h-4">
+                    {/* Dynamic Waveform */}
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-1 bg-zinc-900 dark:bg-white rounded-full transition-all duration-75"
+                        style={{
+                          height: `${Math.max(4, Math.min(24, 4 + (Math.random() * ((agentSpeaking ? 1 : volume) * 30))))}px`,
+                          opacity: agentSpeaking ? 0.8 : (volume > 0.1 ? 0.8 : 0.3)
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Text Status */}
+              {isConnected && !error && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex-1 min-w-0 flex flex-col justify-center"
+                >
+                  <span className="text-xs font-bold text-zinc-900 dark:text-white tracking-wide">
+                    {agentSpeaking ? 'Speaking...' : (volume > 0.2 ? 'Listening...' : 'Gemini Live')}
+                  </span>
+                  <span className="text-[10px] text-zinc-500 truncate">
+                    {lessonSign} Lesson
+                  </span>
+                </motion.div>
+              )}
+
+              {/* Connecting Text */}
+              {!isConnected && !error && (
+                <span className="flex-1 text-xs text-zinc-400 font-medium ml-2">Connecting...</span>
+              )}
+
+              {/* Error Text */}
+              {error && (
+                <div className="flex-1 flex flex-col justify-center text-white">
+                  <span className="text-xs font-bold">{error}</span>
+                  <span className="text-[10px] opacity-80 cursor-pointer hover:underline" onClick={handleRetry}>Tap to Retry</span>
                 </div>
+              )}
 
-                {/* Text Status */}
-                {isConnected && (
-                    <motion.div 
-                        initial={{ opacity: 0 }} 
-                        animate={{ opacity: 1 }} 
-                        className="flex-1 min-w-0 flex flex-col justify-center"
-                    >
-                        <span className="text-xs font-bold text-white tracking-wide">
-                            {agentSpeaking ? 'Speaking...' : (volume > 0.2 ? 'Listening...' : 'Gemini Live')}
-                        </span>
-                        <span className="text-[10px] text-zinc-500 truncate">
-                            {lessonSign} Lesson
-                        </span>
-                    </motion.div>
+              {/* Controls */}
+              <div className="flex items-center gap-1">
+                {error ? (
+                  <button
+                    onClick={handleRetry}
+                    className="p-2 rounded-full hover:bg-white/20 text-white transition-colors"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                ) : isConnected && (
+                  <button
+                    onClick={() => setIsMuted(!isMuted)}
+                    className={`p-2 rounded-full transition-colors ${isMuted ? 'bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400' : 'hover:bg-zinc-100 dark:hover:bg-white/10 text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
+                  >
+                    {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                  </button>
                 )}
 
-                {!isConnected && (
-                     <span className="flex-1 text-xs text-zinc-400 font-medium ml-2">Connecting...</span>
-                )}
-
-                {/* Controls */}
-                {isConnected && (
-                    <div className="flex items-center gap-1">
-                        <button 
-                            onClick={() => setIsMuted(!isMuted)}
-                            className={`p-2 rounded-full transition-colors ${isMuted ? 'bg-red-500/20 text-red-400' : 'hover:bg-white/10 text-zinc-400 hover:text-white'}`}
-                        >
-                            {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                        </button>
-                        <button 
-                            onClick={toggleActive}
-                            className="p-2 rounded-full hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors"
-                        >
-                            <StopCircle className="w-4 h-4" />
-                        </button>
-                    </div>
-                )}
+                <button
+                  onClick={toggleActive}
+                  className={`p-2 rounded-full transition-colors ${error ? 'hover:bg-white/20 text-white' : 'hover:bg-red-500/10 text-zinc-400 hover:text-red-500 dark:hover:bg-red-500/20 dark:hover:text-red-400'}`}
+                >
+                  {error ? <X className="w-4 h-4" /> : <StopCircle className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
