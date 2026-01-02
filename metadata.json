@@ -1,0 +1,8 @@
+{
+  "name": "Signify",
+  "description": "A gamified ASL learning platform using MediaPipe and Gemini.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
