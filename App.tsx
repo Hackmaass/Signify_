@@ -30,8 +30,8 @@ const generateAlphabet = (): Lesson[] => {
 };
 
 const ALPHABET_LESSONS: Lesson[] = generateAlphabet().map(l => {
-    // Correcting a known issue where J/Z are dynamic but listed as static in simple generators
-    if (l.letter === 'J' || l.letter === 'Z') return { ...l, type: 'dynamic' };
+    if (l.letter === 'J') { l.description = "Trace a 'J' in the air with your pinky."; l.type = 'dynamic'; }
+    if (l.letter === 'Z') { l.description = "Trace a 'Z' in the air with your index finger."; l.type = 'dynamic'; }
     return l;
 });
 
@@ -203,8 +203,8 @@ export default function App() {
                                                             key={tab}
                                                             onClick={() => setActiveTab(tab as LessonCategory)}
                                                             className={`relative px-8 py-3 rounded-xl text-sm font-bold transition-all duration-300 z-10 ${activeTab === tab
-                                                                    ? 'text-black dark:text-black'
-                                                                    : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+                                                                ? 'text-black dark:text-black'
+                                                                : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
                                                                 }`}
                                                         >
                                                             {tab === 'custom' ? 'AI Generator' : `${tab.charAt(0).toUpperCase() + tab.slice(1)}s`}
@@ -400,8 +400,8 @@ const PhraseCard: React.FC<{ lesson: Lesson, onClick: () => void, index: number 
                         {lesson.category}
                     </span>
                     <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${lesson.difficulty === 'Easy'
-                            ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20'
-                            : 'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20'
+                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20'
+                        : 'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20'
                         }`}>
                         {lesson.difficulty}
                     </span>
