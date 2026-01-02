@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
-import { Mic, MicOff, Sparkles, X, Video, VideoOff, Loader2, Volume2, StopCircle, Info, Camera, MessageSquareText, Check, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Mic, MicOff, Sparkles, X, Loader2, StopCircle, Info, Camera, MessageSquareText, Check, AlertTriangle, RefreshCw } from 'lucide-react';
 import { HandTrackingRef } from './HandTrackingCanvas';
 import { FeedbackResponse } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -79,6 +79,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
   const videoIntervalRef = useRef<number | null>(null);
   const prevSignRef = useRef(lessonSign);
   const audioStreamingEnabledRef = useRef(false); // Gate audio input
+  const connectionTimeoutRef = useRef<any>(null);
 
   const toggleActive = () => {
     if (isActive) {
@@ -99,32 +100,43 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
   const connect = async () => {
     if (activeRef.current) return;
 
-    // Check API Key immediately
-    if (!process.env.API_KEY || process.env.API_KEY === 'mock-key') {
+    // Safely access API KEY
+    let apiKey = '';
+    try {
+      apiKey = process.env.API_KEY || '';
+    } catch (e) { console.error(e); }
+
+    if (!apiKey || apiKey === 'mock-key') {
       setError("Invalid API Key");
-      setIsActive(true); // Keep UI active to show error
+      setIsActive(true);
       return;
     }
 
     activeRef.current = true;
-    audioStreamingEnabledRef.current = false; // Reset streaming gate
+    audioStreamingEnabledRef.current = false;
     setError(null);
 
+    // Set a safety timeout
+    if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+    connectionTimeoutRef.current = setTimeout(() => {
+      if (!isConnected && activeRef.current) {
+        console.warn("Connection timed out");
+        setError("Connection Timed Out");
+        disconnect();
+      }
+    }, 12000); // 12 seconds timeout
+
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: apiKey });
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
 
       inputContextRef.current = inputCtx;
       outputContextRef.current = outputCtx;
 
-      // Ensure contexts are running (handling autoplay policies)
-      try {
-        if (inputCtx.state === 'suspended') await inputCtx.resume();
-        if (outputCtx.state === 'suspended') await outputCtx.resume();
-      } catch (e) {
-        console.warn("Audio Context Resume failed (interaction required):", e);
-      }
+      // Non-blocking resume to prevent hanging
+      if (inputCtx.state === 'suspended') { void inputCtx.resume().catch(() => { }); }
+      if (outputCtx.state === 'suspended') { void outputCtx.resume().catch(() => { }); }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
@@ -158,6 +170,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
         callbacks: {
           onopen: () => {
             console.log('Gemini Live Socket Opened');
+            if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
             setIsConnected(true);
             setError(null);
 
@@ -205,6 +218,8 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
           onerror: (err: any) => {
             console.error("Gemini Live Session Error:", err);
             setIsConnected(false);
+            if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+
             // Attempt to extract meaningful error
             const msg = err.message || err.toString();
             if (msg.includes("403")) setError("Invalid API Key");
@@ -303,6 +318,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
     activeRef.current = false;
     audioStreamingEnabledRef.current = false;
     setIsConnected(false);
+    if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
 
     // Close audio contexts to release hardware
     if (inputContextRef.current) {
