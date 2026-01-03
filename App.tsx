@@ -150,14 +150,14 @@ export default function App() {
                                             <Dock items={dockItems} />
                                         </div>
                                         <div className="absolute top-8 left-8 z-50">
-                                            <h1 className="text-3xl font-bold tracking-tighter text-white">Signify</h1>
+                                            <h1 className="text-3xl font-bold tracking-tighter text-zinc-900 dark:text-white">Signify</h1>
                                         </div>
 
                                         {/* Dashboard Header Area */}
                                         <header className="flex flex-col lg:flex-row justify-between items-end gap-12 mt-20 mb-20">
                                             <div className="flex-1">
                                                 <h2 className="text-zinc-500 font-medium mb-2 text-lg">Welcome back, {user.displayName || 'Learner'}</h2>
-                                                <h1 className="text-6xl lg:text-7xl font-bold tracking-tighter text-white drop-shadow-lg">Dashboard</h1>
+                                                <h1 className="text-6xl lg:text-7xl font-bold tracking-tighter text-zinc-900 dark:text-white drop-shadow-sm">Dashboard</h1>
                                             </div>
                                             <div className="w-full lg:w-auto">
                                                 <StreakCalendar user={user} />
@@ -166,19 +166,19 @@ export default function App() {
 
                                         {/* Tab Navigation */}
                                         <nav className="flex justify-center mb-12">
-                                            <div className="p-1 bg-[#121214] border border-white/5 rounded-2xl inline-flex relative">
+                                            <div className="p-1 bg-white dark:bg-[#121214] border border-zinc-200 dark:border-white/5 rounded-2xl inline-flex relative shadow-sm">
                                                 {['alphabet', 'phrase', 'custom'].map((tab) => (
                                                     <button
                                                         key={tab}
                                                         onClick={() => setActiveTab(tab as LessonCategory)}
-                                                        className={`relative px-10 py-3 rounded-xl text-sm font-bold transition-all duration-300 z-10 ${activeTab === tab ? 'text-black' : 'text-zinc-500 hover:text-zinc-300'
+                                                        className={`relative px-10 py-3 rounded-xl text-sm font-bold transition-all duration-300 z-10 ${activeTab === tab ? 'text-white dark:text-zinc-900' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
                                                             }`}
                                                     >
                                                         {tab === 'custom' ? 'AI Generator' : `${tab.charAt(0).toUpperCase() + tab.slice(1)}s`}
                                                         {activeTab === tab && (
                                                             <motion.div
                                                                 layoutId="active-tab"
-                                                                className="absolute inset-0 bg-white rounded-xl shadow-lg -z-10"
+                                                                className="absolute inset-0 bg-zinc-900 dark:bg-white rounded-xl shadow-lg -z-10"
                                                                 transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                                                             />
                                                         )}
@@ -214,20 +214,20 @@ export default function App() {
 
                                                 {activeTab === 'custom' && (
                                                     <div className="w-full max-w-3xl mx-auto">
-                                                        <div className="bg-[#121214] border border-white/5 rounded-3xl p-8 mb-12">
-                                                            <h3 className="text-2xl font-bold text-white mb-2">AI Lesson Generator</h3>
-                                                            <p className="text-zinc-400 mb-6">Type anything you want to learn, and Gemini will create a lesson plan.</p>
+                                                        <div className="bg-white dark:bg-[#121214] border border-zinc-200 dark:border-white/5 rounded-3xl p-8 mb-12 shadow-sm">
+                                                            <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">AI Lesson Generator</h3>
+                                                            <p className="text-zinc-500 dark:text-zinc-400 mb-6">Type anything you want to learn, and Gemini will create a lesson plan.</p>
 
                                                             <form onSubmit={handleGenerateLesson} className="flex gap-4">
                                                                 <input
                                                                     value={customInput}
                                                                     onChange={(e) => setCustomInput(e.target.value)}
                                                                     placeholder="e.g. Nice to meet you"
-                                                                    className="flex-1 bg-black/50 border border-white/10 rounded-xl px-6 py-4 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                                                                    className="flex-1 bg-zinc-100 dark:bg-black/50 border border-zinc-200 dark:border-white/10 rounded-xl px-6 py-4 text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                                                                 />
                                                                 <button
                                                                     disabled={isGenerating}
-                                                                    className="bg-white text-black px-8 rounded-xl font-bold hover:bg-zinc-200 transition-colors flex items-center gap-2"
+                                                                    className="bg-zinc-900 dark:bg-white text-white dark:text-black px-8 rounded-xl font-bold hover:opacity-90 transition-opacity flex items-center gap-2"
                                                                 >
                                                                     {isGenerating ? <Loader2 className="animate-spin w-5 h-5" /> : <Wand2 className="w-5 h-5" />}
                                                                     Generate
@@ -238,10 +238,10 @@ export default function App() {
                                                                 <motion.div
                                                                     initial={{ opacity: 0, scale: 0.95 }}
                                                                     animate={{ opacity: 1, scale: 1 }}
-                                                                    className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400 text-sm"
+                                                                    className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-500 dark:text-red-400 text-sm"
                                                                 >
                                                                     <AlertTriangle className="w-4 h-4 shrink-0" />
-                                                                    <p>{genError}</p>
+                                                                    <p className="font-medium">{genError}</p>
                                                                 </motion.div>
                                                             )}
                                                         </div>
@@ -275,19 +275,31 @@ const Card = ({ lesson, index, onClick }: { lesson: Lesson, index: number, onCli
         layout
         whileHover={{ y: -5 }}
         onClick={onClick}
-        className="group relative aspect-[3/4] bg-[#121214] border border-white/5 rounded-3xl p-4 flex flex-col justify-between cursor-pointer hover:border-white/20 transition-colors overflow-hidden"
+        className="group relative aspect-square bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-white/5 rounded-3xl overflow-hidden cursor-pointer hover:border-blue-500/30 transition-all duration-300 shadow-sm hover:shadow-xl"
     >
-        <div className="flex justify-between items-start z-10">
-            <span className="text-[10px] font-bold text-zinc-600 group-hover:text-zinc-400 transition-colors">{(index + 1).toString().padStart(2, '0')}</span>
+        {/* Header */}
+        <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-20">
+            <span className="text-[10px] font-bold text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors">{(index + 1).toString().padStart(2, '0')}</span>
             <div className={`w-2 h-2 rounded-full ${lesson.difficulty === 'Easy' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
         </div>
 
-        <div className="absolute inset-0 flex items-center justify-center p-8 opacity-80 group-hover:scale-110 transition-transform duration-500">
-            <img src={lesson.imageUrl} className="w-full h-full object-contain dark-invert" alt={lesson.letter} />
+        {/* Big Typography Background */}
+        <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none translate-y-4">
+            <span className="text-[140px] font-black text-zinc-900/5 dark:text-white/5 leading-none select-none group-hover:scale-110 transition-transform duration-500">
+                {lesson.letter}
+            </span>
         </div>
 
-        <div className="text-center z-10">
-            <h3 className="text-2xl font-bold text-white">{lesson.letter}</h3>
+        {/* Hand Image */}
+        <div className="absolute inset-0 flex items-center justify-center p-8 z-10 transition-transform duration-500 group-hover:-translate-y-2">
+            <img src={lesson.imageUrl} className="w-full h-full object-contain dark-invert drop-shadow-sm" alt={lesson.letter} />
+        </div>
+
+        {/* Hover Label */}
+        <div className="absolute bottom-3 left-0 right-0 text-center z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 translate-y-2 group-hover:translate-y-0">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 dark:text-zinc-400 bg-white/80 dark:bg-black/50 px-3 py-1 rounded-full backdrop-blur-md">
+                Letter {lesson.letter}
+            </span>
         </div>
     </motion.div>
 );
@@ -297,21 +309,21 @@ const PhraseCard = ({ lesson, index, onClick }: { lesson: Lesson, index: number,
         layout
         whileHover={{ y: -5 }}
         onClick={onClick}
-        className="group bg-[#121214] border border-white/5 rounded-3xl p-6 cursor-pointer hover:border-white/20 transition-colors flex items-center gap-6"
+        className="group bg-white dark:bg-zinc-900/50 border border-zinc-200 dark:border-white/5 rounded-3xl p-6 cursor-pointer hover:border-blue-500/30 transition-all duration-300 flex items-center gap-6 shadow-sm hover:shadow-xl"
     >
-        <div className="w-20 h-20 bg-zinc-900 rounded-2xl p-2 shrink-0">
+        <div className="w-20 h-20 bg-zinc-100 dark:bg-zinc-800 rounded-2xl p-2 shrink-0 flex items-center justify-center">
             <img src={lesson.imageUrl} className="w-full h-full object-contain dark-invert" alt={lesson.letter} />
         </div>
         <div>
             <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] font-bold text-zinc-600 uppercase">{(index + 1).toString().padStart(2, '0')}</span>
+                <span className="text-[10px] font-bold text-zinc-400 uppercase">{(index + 1).toString().padStart(2, '0')}</span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${lesson.difficulty === 'Easy' ? 'border-emerald-500/30 text-emerald-500' : 'border-amber-500/30 text-amber-500'}`}>{lesson.difficulty}</span>
             </div>
-            <h3 className="text-xl font-bold text-white mb-1">{lesson.letter}</h3>
+            <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-1">{lesson.letter}</h3>
             <p className="text-xs text-zinc-500 line-clamp-1">{lesson.description}</p>
         </div>
         <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity -translate-x-2 group-hover:translate-x-0 duration-300">
-            <Play className="w-5 h-5 text-white fill-white" />
+            <Play className="w-5 h-5 text-blue-500 fill-blue-500" />
         </div>
     </motion.div>
 );
