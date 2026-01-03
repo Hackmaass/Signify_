@@ -1,20 +1,32 @@
-import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { FeedbackResponse, Lesson } from '../types';
 
-// Lazy Init Function to safely access env vars in various environments
-const getAI = () => {
-  let apiKey = '';
-  try { apiKey = process.env.API_KEY || ''; } catch (e) { }
-  if (!apiKey) {
-    try {
-      // @ts-ignore
-      apiKey = import.meta.env.VITE_API_KEY || '';
-    } catch (e) { }
-  }
-  return new GoogleGenAI({ apiKey });
+// Universal Safe Key Access (Works for Vite, Next.js, CRA, and Node)
+const getApiKey = () => {
+  let key = '';
+
+  // 1. Try Vite (Client-side)
+  try {
+    // @ts-ignore
+    if (import.meta.env?.VITE_API_KEY) key = import.meta.env.VITE_API_KEY;
+    // @ts-ignore
+    else if (import.meta.env?.VITE_GEMINI_API_KEY) key = import.meta.env.VITE_GEMINI_API_KEY;
+  } catch (e) { }
+
+  if (key) return key;
+
+  // 2. Try Process Env (Next.js / CRA / Node)
+  try {
+    if (process.env.NEXT_PUBLIC_API_KEY) key = process.env.NEXT_PUBLIC_API_KEY;
+    else if (process.env.REACT_APP_API_KEY) key = process.env.REACT_APP_API_KEY;
+    else if (process.env.API_KEY) key = process.env.API_KEY;
+  } catch (e) { }
+
+  return key;
 };
 
-// Fast & Spontaneous Analysis
+const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+
+// Fast & Spontaneous Analysis via REST
 export const evaluateHandSign = async (
   imageBase64: string,
   targetSign: string,
@@ -22,7 +34,9 @@ export const evaluateHandSign = async (
   signType: 'static' | 'dynamic' = 'static'
 ): Promise<FeedbackResponse> => {
   try {
-    const ai = getAI();
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error("API Key missing. Please set VITE_API_KEY or NEXT_PUBLIC_API_KEY.");
+
     const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpeg);base64,/, "");
 
     const prompt = `
@@ -47,30 +61,41 @@ export const evaluateHandSign = async (
       }
     `;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: {
+    const body = {
+      contents: [{
         parts: [
-          { inlineData: { mimeType: 'image/png', data: cleanBase64 } },
+          { inline_data: { mime_type: "image/png", data: cleanBase64 } },
           { text: prompt }
         ]
-      },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
+      }],
+      generationConfig: {
+        response_mime_type: "application/json",
+        response_schema: {
+          type: "OBJECT",
           properties: {
-            score: { type: Type.INTEGER },
-            feedback: { type: Type.STRING },
-            isCorrect: { type: Type.BOOLEAN }
+            score: { type: "INTEGER" },
+            feedback: { type: "STRING" },
+            isCorrect: { type: "BOOLEAN" }
           },
           required: ["score", "feedback", "isCorrect"]
         }
       }
+    };
+
+    const response = await fetch(`${BASE_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
     });
 
-    const text = response.text;
-    if (!text) throw new Error("No response");
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!text) throw new Error("No response content");
     return JSON.parse(text) as FeedbackResponse;
 
   } catch (error) {
@@ -83,10 +108,12 @@ export const evaluateHandSign = async (
   }
 };
 
-// Generates a lesson plan from a raw sentence
+// Generates a lesson plan from a raw sentence via REST
 export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> => {
   try {
-    const ai = getAI();
+    const apiKey = getApiKey();
+    if (!apiKey) return [];
+
     const prompt = `
       You are an ASL Teacher. Convert the sentence "${sentence}" into a sequence of ASL signs (Gloss).
       For each sign, provide a lesson object.
@@ -101,29 +128,38 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
       }
     `;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: { text: prompt },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
+    const body = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        response_mime_type: "application/json",
+        response_schema: {
+          type: "ARRAY",
           items: {
-            type: Type.OBJECT,
+            type: "OBJECT",
             properties: {
-              sign: { type: Type.STRING },
-              type: { type: Type.STRING, enum: ["static", "dynamic"] },
-              difficulty: { type: Type.STRING, enum: ["Easy", "Medium", "Hard"] },
-              description: { type: Type.STRING },
-              instruction: { type: Type.STRING }
+              sign: { type: "STRING" },
+              type: { type: "STRING", enum: ["static", "dynamic"] },
+              difficulty: { type: "STRING", enum: ["Easy", "Medium", "Hard"] },
+              description: { type: "STRING" },
+              instruction: { type: "STRING" }
             },
             required: ["sign", "type", "difficulty", "description", "instruction"]
           }
         }
       }
+    };
+
+    const response = await fetch(`${BASE_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
     });
 
-    const text = response.text;
+    if (!response.ok) throw new Error("API Failed");
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
     if (!text) return [];
 
     const rawData = JSON.parse(text);
@@ -156,23 +192,35 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
   }
 };
 
+// Generates speech via REST using audio modalities
 export const generateSpeech = async (text: string): Promise<string | null> => {
   try {
-    const ai = getAI();
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-preview-tts',
-      contents: { parts: [{ text }] },
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' },
+    const apiKey = getApiKey();
+    if (!apiKey) return null;
+
+    const body = {
+      contents: [{ parts: [{ text }] }],
+      generationConfig: {
+        response_modalities: ["AUDIO"],
+        speech_config: {
+          voice_config: {
+            prebuilt_voice_config: { voice_name: 'Kore' },
           },
         },
-      },
+      }
+    };
+
+    const response = await fetch(`${BASE_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
     });
 
-    const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const audioData = data.candidates?.[0]?.content?.parts?.[0]?.inline_data?.data;
+
     return audioData || null;
 
   } catch (e) {

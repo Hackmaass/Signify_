@@ -13,6 +13,32 @@ interface LiveTutorProps {
   triggerIntro?: boolean;
 }
 
+// Universal Safe Key Access (Works for Vite, Next.js, CRA, and Node)
+const getApiKey = () => {
+  let key = '';
+
+  // 1. Try Vite (Client-side)
+  try {
+    // @ts-ignore
+    if (import.meta.env?.VITE_API_KEY) key = import.meta.env.VITE_API_KEY;
+    // @ts-ignore
+    else if (import.meta.env?.VITE_GEMINI_API_KEY) key = import.meta.env.VITE_GEMINI_API_KEY;
+  } catch (e) { }
+
+  if (key) return key;
+
+  // 2. Try Process Env (Next.js / CRA / Node)
+  try {
+    if (process.env.NEXT_PUBLIC_API_KEY) key = process.env.NEXT_PUBLIC_API_KEY;
+    else if (process.env.REACT_APP_API_KEY) key = process.env.REACT_APP_API_KEY;
+    else if (process.env.API_KEY) key = process.env.API_KEY;
+  } catch (e) { }
+
+  return key;
+};
+
+
+
 // --- Audio Helpers ---
 function createBlob(data: Float32Array): { data: string; mimeType: string } {
   const l = data.length;
@@ -62,19 +88,6 @@ async function decodeAudioData(
   return buffer;
 }
 
-// Safe Key Access for Localhost (Vite/CRA compatible)
-const getApiKey = () => {
-  let key = '';
-  try { key = process.env.API_KEY || ''; } catch (e) { }
-  if (!key) {
-    try {
-      // @ts-ignore
-      key = import.meta.env.VITE_API_KEY || '';
-    } catch (e) { }
-  }
-  return key;
-};
-
 export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, feedback, triggerIntro }: LiveTutorProps) {
   // Auto-start by default
   const [isActive, setIsActive] = useState(true);
@@ -117,7 +130,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
     const apiKey = getApiKey();
 
     if (!apiKey || apiKey === 'mock-key') {
-      setError("Invalid API Key");
+      setError("Missing API Key");
       setIsActive(true);
       return;
     }
@@ -167,7 +180,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
                 1. As soon as you connect, you MUST SPEAK FIRST. Do not wait for the user.
                 2. Say exactly: "Welcome! Let's practice the sign for ${lessonSign}. ${lessonDescription}"
                 3. I (The System) will send you "SYSTEM NOTIFICATIONS" regarding the user's performance.
-                4. IMPORTANT: If you receive a notification that the user SUCCEEDED, you MUST interrupt yourself and immediately congratulate them enthusiastically. Say something like "Great job!" or "Perfect!".
+                4. IMPORTANT: If you receive a notification that the user SUCCEEDED, you MUST interrupts yourself and immediately congratulate them enthusiastically. Say something like "Great job!" or "Perfect!".
                 5. If you receive a notification that the user FAILED, explain the specific error provided in the notification.
                 6. Keep all responses concise (under 2 sentences).`
             }]
