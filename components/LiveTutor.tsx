@@ -151,7 +151,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const config = {
-        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+        model: 'gemini-2.0-flash-exp', // Updated to public beta model to fix Network Error
         config: {
           responseModalities: [Modality.AUDIO],
           // INSTRUCTION: Crucial for "Speaking First"
@@ -183,8 +183,6 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
             setIsConnected(true);
             setError(null);
-
-            // REMOVED WAKE HACK: Reliance on systemInstruction to speak first is safer.
           },
           onmessage: async (msg: LiveServerMessage) => {
             if (!activeRef.current) return;
@@ -212,21 +210,17 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
           },
           onclose: (e) => {
             console.log("Gemini Live Socket Closed", e);
+            sessionRef.current = null; // CRITICAL: Mark session as dead immediately
             setIsConnected(false);
-            activeRef.current = false; // Stop loops immediately
-            audioStreamingEnabledRef.current = false;
-            if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
-
             // Only set error if it wasn't a manual disconnect
             if (activeRef.current) {
               const code = e.code || 'Unknown';
               if (code === 1000) {
-                // Normal closure
                 setError("Session Ended");
-              } else if (code === 1006) {
-                setError("Connection Failed (1006)");
               } else if (code === 1011) {
                 setError("API Quota Exceeded");
+              } else if (code === 1006) {
+                setError("Connection Failed (1006)");
               } else {
                 setError(`Connection Closed (${code})`);
               }
@@ -241,7 +235,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             const msg = err.message || err.toString();
             if (msg.includes("403")) setError("Invalid API Key");
             else if (msg.includes("404")) setError("Model Not Found");
-            else setError("Connection Failed");
+            else setError("Network Error");
           }
         }
       });
@@ -289,12 +283,12 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
         const pcmBlob = createBlob(inputData);
 
         sessionPromise.then(async (session) => {
+          // CRITICAL CHECK: ensure session is still the active one and not null
           if (activeRef.current && sessionRef.current === session) {
             try {
-              // Explicitly await and catch to prevent unhandled promise rejections which cause "Network Error"
               await session.sendRealtimeInput({ media: pcmBlob });
             } catch (e) {
-              // Ignore send errors which happen if socket closes mid-stream
+              // This is expected if the socket closes mid-stream.
             }
           }
         }).catch(() => { });
@@ -397,24 +391,19 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
   // 4. Handle Feedback Injection (Auto-Speak)
   useEffect(() => {
     if (activeRef.current && sessionRef.current && feedback) {
-      // Construct a direct instruction to the model to speak immediately
       const prompt = feedback.isCorrect
         ? `[SYSTEM NOTIFICATION]: The user just COMPLETED the sign "${lessonSign}" CORRECTLY. \n\nACTION REQUIRED: Immediately speak to the user. Congratulate them enthusiastically on getting it right. Keep it brief (1 sentence).`
         : `[SYSTEM NOTIFICATION]: The user just attempted the sign "${lessonSign}" but made a MISTAKE. \n\nError Analysis: "${feedback.feedback}". \n\nACTION REQUIRED: Immediately speak to the user. Do not say "System notification". Directly address the user and explain exactly how to fix their hand shape based on the Error Analysis above. Be helpful and encouraging.`;
 
-      // CRITICAL: Temporarily pause microphone input stream to ensuring the model processes
-      // the text event as a distinct "User Turn" without ambient noise or VAD keeping the turn open.
       audioStreamingEnabledRef.current = false;
 
       try {
         console.log("Triggering AI Tutor Feedback:", feedback.isCorrect ? "Success" : "Correction");
-        // Sending text in a Live session triggers the model to respond
         sessionRef.current.send({ parts: [{ text: prompt }] }, true);
       } catch (e) {
         console.warn("Failed to send feedback text to Gemini Live:", e);
       }
 
-      // Re-enable mic after a delay to allow model to start speaking
       setTimeout(() => {
         if (activeRef.current) audioStreamingEnabledRef.current = true;
       }, 3000);
@@ -503,8 +492,8 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             }}
             exit={{ width: 60, opacity: 0 }}
             className={`backdrop-blur-2xl border flex items-center justify-between px-2 overflow-hidden relative shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition-colors duration-500 ${error
-              ? 'bg-red-500/90 border-red-400/50'
-              : 'bg-white/90 dark:bg-[#0a0a0a]/90 border-zinc-200 dark:border-white/10'
+                ? 'bg-red-500/90 border-red-400/50'
+                : 'bg-white/90 dark:bg-[#0a0a0a]/90 border-zinc-200 dark:border-white/10'
               }`}
           >
             {/* Background Glow */}
