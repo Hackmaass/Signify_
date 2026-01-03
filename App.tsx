@@ -52,16 +52,6 @@ export default function App() {
     const [lessonQueue, setLessonQueue] = useState<Lesson[]>([]);
     const [currentQueueIndex, setCurrentQueueIndex] = useState<number>(-1);
     const [loading, setLoading] = useState(true);
-    useEffect(() => {
-        // DEBUG: Check if API key is loaded
-        if (!process.env.API_KEY) {
-            console.error("CRITICAL: API_KEY is missing in process.env!");
-            alert("DEBUG ERROR: Gemini API Key is missing. Check .env.local and restart server.");
-        } else {
-            console.log("Gemini API Key is present.");
-        }
-    }, []);
-
     const [activeTab, setActiveTab] = useState<LessonCategory>('alphabet');
     const [customInput, setCustomInput] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
@@ -177,10 +167,10 @@ export default function App() {
                                         <Dock items={dockItems} />
 
                                         {/* Signify Text Logo (Fixed Top-Left for Brand Visibility) */}
-                                        <div className="fixed top-6 left-8 z-40 pointer-events-none select-none mix-blend-difference text-white">
+                                        <div className="fixed top-6 left-8 z-40 pointer-events-none select-none">
                                             <motion.h1
                                                 layoutId="app-logo"
-                                                className="text-4xl font-black tracking-tighter"
+                                                className="text-4xl font-black tracking-tighter text-zinc-900 dark:text-white"
                                             >
                                                 Signify
                                             </motion.h1>
