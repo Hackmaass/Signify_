@@ -28,7 +28,7 @@ const getClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-const DEFAULT_MODEL = "gemini-1.5-flash-latest";
+const DEFAULT_MODEL = "gemini-1.5-flash";
 
 // Fast & Spontaneous Analysis via SDK
 export const evaluateHandSign = async (
