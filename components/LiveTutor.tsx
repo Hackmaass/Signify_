@@ -18,6 +18,7 @@ function createBlob(data: Float32Array): { data: string; mimeType: string } {
   const l = data.length;
   const int16 = new Int16Array(l);
   for (let i = 0; i < l; i++) {
+    // Clamp to 16-bit range
     int16[i] = Math.max(-32768, Math.min(32767, data[i] * 32768));
   }
   const uint8 = new Uint8Array(int16.buffer);
@@ -61,6 +62,19 @@ async function decodeAudioData(
   return buffer;
 }
 
+// Safe Key Access for Localhost (Vite/CRA compatible)
+const getApiKey = () => {
+  let key = '';
+  try { key = process.env.API_KEY || ''; } catch (e) { }
+  if (!key) {
+    try {
+      // @ts-ignore
+      key = import.meta.env.VITE_API_KEY || '';
+    } catch (e) { }
+  }
+  return key;
+};
+
 export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, feedback, triggerIntro }: LiveTutorProps) {
   // Auto-start by default
   const [isActive, setIsActive] = useState(true);
@@ -100,11 +114,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
   const connect = async () => {
     if (activeRef.current) return;
 
-    // Safely access API KEY
-    let apiKey = '';
-    try {
-      apiKey = process.env.API_KEY || '';
-    } catch (e) { console.error(e); }
+    const apiKey = getApiKey();
 
     if (!apiKey || apiKey === 'mock-key') {
       setError("Invalid API Key");
@@ -124,7 +134,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
         setError("Connection Timed Out");
         disconnect();
       }
-    }, 12000); // 12 seconds timeout
+    }, 15000); // 15 seconds timeout
 
     try {
       const ai = new GoogleGenAI({ apiKey: apiKey });
@@ -174,14 +184,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             setIsConnected(true);
             setError(null);
 
-            // HACK: Send a tiny silent audio frame to "wake" the model and trigger the turn
-            try {
-              const silentData = new Float32Array(1024).fill(0);
-              const pcmBlob = createBlob(silentData);
-              sessionPromise.then(session => {
-                session.sendRealtimeInput({ media: pcmBlob });
-              });
-            } catch (e) { console.warn("Wake signal failed", e); }
+            // REMOVED WAKE HACK: Reliance on systemInstruction to speak first is safer.
           },
           onmessage: async (msg: LiveServerMessage) => {
             if (!activeRef.current) return;
@@ -212,7 +215,15 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             setIsConnected(false);
             // Only set error if it wasn't a manual disconnect
             if (activeRef.current) {
-              setError("Connection Closed");
+              const code = e.code || 'Unknown';
+              if (code === 1000) {
+                // Normal closure
+                setError("Session Ended");
+              } else if (code === 1006) {
+                setError("Connection Failed (1006)");
+              } else {
+                setError(`Connection Closed (${code})`);
+              }
             }
           },
           onerror: (err: any) => {
@@ -239,13 +250,13 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
 
         console.log("Session connected. Waiting to enable audio...");
 
-        // 1.0s delay prevents user ambient noise from interrupting the Model's Intro
+        // 1.5s delay prevents user ambient noise from interrupting the Model's Intro
         setTimeout(() => {
           if (activeRef.current) {
             audioStreamingEnabledRef.current = true;
             console.log("Audio input enabled");
           }
-        }, 1000);
+        }, 1500);
 
       }).catch(err => {
         console.error("Failed to connect:", err);

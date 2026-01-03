@@ -1,7 +1,18 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { FeedbackResponse, Lesson } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy Init Function to safely access env vars in various environments
+const getAI = () => {
+  let apiKey = '';
+  try { apiKey = process.env.API_KEY || ''; } catch (e) { }
+  if (!apiKey) {
+    try {
+      // @ts-ignore
+      apiKey = import.meta.env.VITE_API_KEY || '';
+    } catch (e) { }
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 // Fast & Spontaneous Analysis
 export const evaluateHandSign = async (
@@ -11,6 +22,7 @@ export const evaluateHandSign = async (
   signType: 'static' | 'dynamic' = 'static'
 ): Promise<FeedbackResponse> => {
   try {
+    const ai = getAI();
     const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpeg);base64,/, "");
 
     const prompt = `
@@ -74,6 +86,7 @@ export const evaluateHandSign = async (
 // Generates a lesson plan from a raw sentence
 export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> => {
   try {
+    const ai = getAI();
     const prompt = `
       You are an ASL Teacher. Convert the sentence "${sentence}" into a sequence of ASL signs (Gloss).
       For each sign, provide a lesson object.
@@ -140,5 +153,30 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
   } catch (error) {
     console.error("Lesson Gen Error:", error);
     return [];
+  }
+};
+
+export const generateSpeech = async (text: string): Promise<string | null> => {
+  try {
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-preview-tts',
+      contents: { parts: [{ text }] },
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
+          },
+        },
+      },
+    });
+
+    const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    return audioData || null;
+
+  } catch (e) {
+    console.error("TTS Generation Error:", e);
+    return null;
   }
 };
