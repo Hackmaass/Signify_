@@ -1,197 +1,204 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Signify</title>
-    <link rel="icon" type="image/png" href="/logo.png" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              background: 'var(--bg-primary)',
-              surface: 'var(--bg-surface)',
-              accent: 'var(--accent-primary)',
-              'text-primary': 'var(--text-primary)',
-              'text-secondary': 'var(--text-secondary)',
-            },
-            fontFamily: {
-              sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-              display: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-            },
-            backgroundImage: {
-              'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-              'noise': "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.05%22/%3E%3C/svg%3E')",
-            }
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Signify</title>
+  <link rel="icon" type="image/png" href="/logo.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            background: 'var(--bg-primary)',
+            surface: 'var(--bg-surface)',
+            accent: 'var(--accent-primary)',
+            'text-primary': 'var(--text-primary)',
+            'text-secondary': 'var(--text-secondary)',
+          },
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            display: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          },
+          backgroundImage: {
+            'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+            'noise': "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.05%22/%3E%3C/svg%3E')",
           }
         }
       }
-    </script>
-    <!-- MediaPipe Dependencies -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils@0.6.1675466075/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-      
-      :root {
-        --bg-primary: #09090b;
-        --bg-surface: #18181b;
-        --accent-primary: #3b82f6;
-        --text-primary: #f4f4f5;
-        --text-secondary: #a1a1aa;
-        
-        --glass-border: rgba(255, 255, 255, 0.08);
-        --glass-bg: rgba(24, 24, 27, 0.6);
-        --glass-shine: rgba(255, 255, 255, 0.03);
-      }
+    }
+  </script>
+  <!-- MediaPipe Dependencies -->
+  <!-- MediaPipe Dependencies -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-      :root.light {
-        --bg-primary: #f0f2f5;
-        --bg-surface: #ffffff;
-        --accent-primary: #2563eb;
-        --text-primary: #18181b;
-        --text-secondary: #52525b;
-        
-        --glass-border: rgba(0, 0, 0, 0.04);
-        --glass-bg: rgba(255, 255, 255, 0.7);
-        --glass-shine: rgba(255, 255, 255, 0.5);
-      }
+    :root {
+      --bg-primary: #09090b;
+      --bg-surface: #18181b;
+      --accent-primary: #3b82f6;
+      --text-primary: #f4f4f5;
+      --text-secondary: #a1a1aa;
 
-      body {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        background-color: var(--bg-primary);
-        color: var(--text-primary);
-        -webkit-font-smoothing: antialiased;
-        overflow-x: hidden;
-        transition: background-color 0.5s cubic-bezier(0.16, 1, 0.3, 1), color 0.5s ease;
-      }
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --glass-bg: rgba(24, 24, 27, 0.6);
+      --glass-shine: rgba(255, 255, 255, 0.03);
+    }
 
-      /* Professional Mesh Background */
-      .bg-ambient {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        z-index: -1;
-        overflow: hidden;
-        pointer-events: none;
-        background: var(--bg-primary);
-      }
-      
-      .bg-ambient::before {
-        content: '';
-        position: absolute;
-        top: -20%;
-        right: -10%;
-        width: 80vw;
-        height: 80vh;
-        background: radial-gradient(circle, rgba(59,130,246,0.08) 0%, rgba(0,0,0,0) 70%);
-        border-radius: 50%;
-        filter: blur(80px);
-        opacity: 0.8;
-      }
+    :root.light {
+      --bg-primary: #f0f2f5;
+      --bg-surface: #ffffff;
+      --accent-primary: #2563eb;
+      --text-primary: #18181b;
+      --text-secondary: #52525b;
 
-      .light .bg-ambient::before {
-        background: radial-gradient(circle, rgba(59,130,246,0.05) 0%, rgba(255,255,255,0) 70%);
-      }
+      --glass-border: rgba(0, 0, 0, 0.04);
+      --glass-bg: rgba(255, 255, 255, 0.7);
+      --glass-shine: rgba(255, 255, 255, 0.5);
+    }
 
-      .bg-ambient::after {
-        content: '';
-        position: absolute;
-        bottom: -20%;
-        left: -10%;
-        width: 80vw;
-        height: 80vh;
-        background: radial-gradient(circle, rgba(139,92,246,0.06) 0%, rgba(0,0,0,0) 70%);
-        border-radius: 50%;
-        filter: blur(80px);
-        opacity: 0.8;
-      }
-      
-      .light .bg-ambient::after {
-         background: radial-gradient(circle, rgba(139,92,246,0.04) 0%, rgba(255,255,255,0) 70%);
-      }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+      transition: background-color 0.5s cubic-bezier(0.16, 1, 0.3, 1), color 0.5s ease;
+    }
 
-      /* Noise Texture Overlay */
-      body::before {
-        content: "";
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
-        pointer-events: none;
-        z-index: 9999;
-        mix-blend-mode: overlay;
-      }
+    /* Professional Mesh Background */
+    .bg-ambient {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: -1;
+      overflow: hidden;
+      pointer-events: none;
+      background: var(--bg-primary);
+    }
 
-      /* Premium Glassmorphism */
-      .glass-panel {
-        background: var(--glass-bg);
-        backdrop-filter: blur(24px);
-        -webkit-backdrop-filter: blur(24px);
-        border: 1px solid var(--glass-border);
-        box-shadow: 
-          0 4px 24px -1px rgba(0, 0, 0, 0.05), 
-          inset 0 1px 0 0 var(--glass-shine);
-      }
-      
-      .glass-panel-heavy {
-        background: var(--bg-surface);
-        backdrop-filter: blur(40px);
-        -webkit-backdrop-filter: blur(40px);
-        border: 1px solid var(--glass-border);
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-      }
-      
-      .light .glass-panel-heavy {
-        background: rgba(255,255,255,0.85);
-        box-shadow: 0 20px 40px -10px rgba(0,0,0,0.05);
-      }
+    .bg-ambient::before {
+      content: '';
+      position: absolute;
+      top: -20%;
+      right: -10%;
+      width: 80vw;
+      height: 80vh;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, rgba(0, 0, 0, 0) 70%);
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.8;
+    }
 
-      /* Scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: var(--text-secondary);
-        border-radius: 99px;
-        opacity: 0.2;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: var(--accent-primary);
-      }
+    .light .bg-ambient::before {
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, rgba(255, 255, 255, 0) 70%);
+    }
 
-      /* Utility for text gradients */
-      .text-gradient {
-        background-clip: text;
-        -webkit-background-clip: text;
-        color: transparent;
-        background-image: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
-      }
-      .light .text-gradient {
-        background-image: linear-gradient(135deg, #18181b 0%, #52525b 100%);
-      }
-      
-      /* Invert images in dark mode if they are simple black lineart */
-      .dark-invert {
-        filter: none;
-      }
-      .dark .dark-invert {
-        filter: invert(1) brightness(2);
-      }
-    </style>
+    .bg-ambient::after {
+      content: '';
+      position: absolute;
+      bottom: -20%;
+      left: -10%;
+      width: 80vw;
+      height: 80vh;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.06) 0%, rgba(0, 0, 0, 0) 70%);
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.8;
+    }
+
+    .light .bg-ambient::after {
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.04) 0%, rgba(255, 255, 255, 0) 70%);
+    }
+
+    /* Noise Texture Overlay */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      mix-blend-mode: overlay;
+    }
+
+    /* Premium Glassmorphism */
+    .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--glass-border);
+      box-shadow:
+        0 4px 24px -1px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 0 var(--glass-shine);
+    }
+
+    .glass-panel-heavy {
+      background: var(--bg-surface);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .light .glass-panel-heavy {
+      background: rgba(255, 255, 255, 0.85);
+      box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--text-secondary);
+      border-radius: 99px;
+      opacity: 0.2;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-primary);
+    }
+
+    /* Utility for text gradients */
+    .text-gradient {
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      background-image: linear-gradient(135deg, #fff 0%, #a1a1aa 100%);
+    }
+
+    .light .text-gradient {
+      background-image: linear-gradient(135deg, #18181b 0%, #52525b 100%);
+    }
+
+    /* Invert images in dark mode if they are simple black lineart */
+    .dark-invert {
+      filter: none;
+    }
+
+    .dark .dark-invert {
+      filter: invert(1) brightness(2);
+    }
+  </style>
   <script type="importmap">
 {
   "imports": {
@@ -207,11 +214,13 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
+  <link rel="stylesheet" href="/index.css">
 </head>
-  <body>
-    <div class="bg-ambient"></div>
-    <div id="root"></div>
+
+<body>
+  <div class="bg-ambient"></div>
+  <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
+
 </html>

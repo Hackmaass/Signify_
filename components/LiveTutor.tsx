@@ -213,6 +213,10 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
           onclose: (e) => {
             console.log("Gemini Live Socket Closed", e);
             setIsConnected(false);
+            activeRef.current = false; // Stop loops immediately
+            audioStreamingEnabledRef.current = false;
+            if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+
             // Only set error if it wasn't a manual disconnect
             if (activeRef.current) {
               const code = e.code || 'Unknown';
@@ -221,6 +225,8 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
                 setError("Session Ended");
               } else if (code === 1006) {
                 setError("Connection Failed (1006)");
+              } else if (code === 1011) {
+                setError("API Quota Exceeded");
               } else {
                 setError(`Connection Closed (${code})`);
               }
@@ -497,8 +503,8 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             }}
             exit={{ width: 60, opacity: 0 }}
             className={`backdrop-blur-2xl border flex items-center justify-between px-2 overflow-hidden relative shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition-colors duration-500 ${error
-                ? 'bg-red-500/90 border-red-400/50'
-                : 'bg-white/90 dark:bg-[#0a0a0a]/90 border-zinc-200 dark:border-white/10'
+              ? 'bg-red-500/90 border-red-400/50'
+              : 'bg-white/90 dark:bg-[#0a0a0a]/90 border-zinc-200 dark:border-white/10'
               }`}
           >
             {/* Background Glow */}
