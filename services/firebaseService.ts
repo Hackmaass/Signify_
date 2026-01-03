@@ -1,40 +1,64 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import {
   getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
   signOut as firebaseSignOut,
-  onAuthStateChanged,
-  User
+  onAuthStateChanged
 } from "firebase/auth";
 import { UserData } from '../types';
-import { getAnalytics } from "firebase/analytics";
 
-// --- CONFIGURATION ---
-// IMPORTANT: Replace with your actual Firebase project config for production.
-const firebaseConfig = {
-  apiKey: "AIzaSyBcO19mIR3FBu7040VobqCwjwNIYOh54Ic",
-  authDomain: "signify-ef7ce.firebaseapp.com",
-  projectId: "signify-ef7ce",
-  storageBucket: "signify-ef7ce.firebasestorage.app",
-  messagingSenderId: "420927638288",
-  appId: "1:420927638288:web:67268f62445187d925f395",
-  measurementId: "G-ZKM8G6RGST"
+// Universal Safe Env Access (Works for Vite, Next.js, CRA, and Node)
+const getEnv = (key: string) => {
+  // 1. Try Vite (Client-side)
+  try {
+    // @ts-ignore
+    if (import.meta && import.meta.env && import.meta.env[key]) {
+      // @ts-ignore
+      return import.meta.env[key];
+    }
+  } catch (e) { }
+
+  // 2. Try Process Env (Next.js / CRA / Node)
+  try {
+    if (typeof process !== 'undefined' && process.env && process.env[key]) {
+      return process.env[key];
+    }
+  } catch (e) { }
+
+  return "";
 };
 
+// Config prioritizes Environment Variables, but falls back to your provided keys
+const firebaseConfig = {
+  apiKey: getEnv("VITE_FIREBASE_API_KEY") || "AIzaSyBcO19mIR3FBu7040VobqCwjwNIYOh54Ic",
+  authDomain: getEnv("VITE_FIREBASE_AUTH_DOMAIN") || "signify-ef7ce.firebaseapp.com",
+  projectId: getEnv("VITE_FIREBASE_PROJECT_ID") || "signify-ef7ce",
+  storageBucket: getEnv("VITE_FIREBASE_STORAGE_BUCKET") || "signify-ef7ce.firebasestorage.app",
+  messagingSenderId: getEnv("VITE_FIREBASE_MESSAGING_SENDER_ID") || "420927638288",
+  appId: getEnv("VITE_FIREBASE_APP_ID") || "1:420927638288:web:67268f62445187d925f395",
+  measurementId: getEnv("VITE_FIREBASE_MEASUREMENT_ID") || "G-ZKM8G6RGST"
+};
 
 // Initialize Firebase conditionally
 let app;
 let auth: any;
-let analytics: any;
 let isFirebaseInitialized = false;
 
 try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  analytics = getAnalytics(app);
-  isFirebaseInitialized = true;
+  // Check if config exists before initializing
+  if (firebaseConfig.apiKey) {
+    if (getApps().length === 0) {
+      app = initializeApp(firebaseConfig);
+    } else {
+      app = getApp();
+    }
+    auth = getAuth(app);
+    isFirebaseInitialized = true;
+  } else {
+    console.warn("Firebase config missing. Running in mock mode.");
+  }
 } catch (error) {
   console.warn("Firebase initialization failed. Falling back to mock mode.", error);
 }
@@ -82,19 +106,24 @@ export const registerWithEmail = async (email: string, password: string, name: s
 
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(userCredential.user, {
-      displayName: name,
-      photoURL: `https://api.dicebear.com/7.x/initials/svg?seed=${name}`
-    });
+    const user = userCredential.user;
 
-    // Clear mock session if real login succeeds
-    localStorage.removeItem(MOCK_SESSION_KEY);
+    if (user) {
+      await updateProfile(user, {
+        displayName: name,
+        photoURL: `https://api.dicebear.com/7.x/initials/svg?seed=${name}`
+      });
 
-    return await fetchOrCreateUserData(
-      userCredential.user.uid,
-      name,
-      userCredential.user.photoURL || undefined
-    );
+      // Clear mock session if real login succeeds
+      localStorage.removeItem(MOCK_SESSION_KEY);
+
+      return await fetchOrCreateUserData(
+        user.uid,
+        name,
+        user.photoURL || undefined
+      );
+    }
+    throw new Error("User creation failed");
   } catch (error: any) {
     return handleAuthError(error, email, password, name, 'register');
   }
@@ -105,15 +134,19 @@ export const loginWithEmail = async (email: string, password: string): Promise<U
 
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
 
     // Clear mock session
     localStorage.removeItem(MOCK_SESSION_KEY);
 
-    return await fetchOrCreateUserData(
-      userCredential.user.uid,
-      userCredential.user.displayName || 'Learner',
-      userCredential.user.photoURL || undefined
-    );
+    if (user) {
+      return await fetchOrCreateUserData(
+        user.uid,
+        user.displayName || 'Learner',
+        user.photoURL || undefined
+      );
+    }
+    throw new Error("Login failed");
   } catch (error: any) {
     return handleAuthError(error, email, password, undefined, 'login');
   }
@@ -143,19 +176,18 @@ const handleAuthError = (error: any, email: string, password: string, name: stri
 };
 
 // --- MOCK AUTHENTICATION ---
-// Generates a deterministic UID based on email so different users have different data buckets
 const generateMockUid = (email: string) => {
   let hash = 0;
   for (let i = 0; i < email.length; i++) {
     const char = email.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = hash & hash;
   }
   return `mock-user-${Math.abs(hash)}`;
 };
 
 const mockRegister = async (email: string, pass: string, name: string): Promise<UserData> => {
-  await new Promise(resolve => setTimeout(resolve, 800)); // Simulate delay
+  await new Promise(resolve => setTimeout(resolve, 800));
   const uid = generateMockUid(email);
   const photoURL = `https://api.dicebear.com/7.x/initials/svg?seed=${name}`;
 
@@ -167,13 +199,8 @@ const mockLogin = async (email: string, pass: string): Promise<UserData> => {
   await new Promise(resolve => setTimeout(resolve, 800));
   const uid = generateMockUid(email);
 
-  // Check if we have data for this user to simulate "User not found" (optional, skipping for smoother demo)
-  // const key = getStorageKey(uid);
-  // if (!localStorage.getItem(key)) throw new Error("Mock User not found. Please Register.");
-
   localStorage.setItem(MOCK_SESSION_KEY, uid);
 
-  // We try to fetch existing name from storage, or default to 'Learner' if it's a new mock login
   const stored = localStorage.getItem(getStorageKey(uid));
   const name = stored ? JSON.parse(stored).displayName : 'Demo User';
 
@@ -182,7 +209,7 @@ const mockLogin = async (email: string, pass: string): Promise<UserData> => {
 
 export const signOut = async () => {
   try {
-    if (isFirebaseInitialized) {
+    if (isFirebaseInitialized && auth) {
       try { await firebaseSignOut(auth); } catch (e) { console.warn(e); }
     }
     localStorage.removeItem(MOCK_SESSION_KEY);
@@ -196,22 +223,21 @@ export const onAuthStateChange = (callback: (user: UserData | null) => void) => 
   // 1. Check Mock Session
   const mockUid = localStorage.getItem(MOCK_SESSION_KEY);
   if (mockUid) {
-    // Re-hydrate user data from local storage based on the stored UID
     fetchOrCreateUserData(mockUid, 'User').then(callback);
     return () => { };
   }
 
   // 2. Check Firebase Session
-  if (isFirebaseInitialized) {
+  if (isFirebaseInitialized && auth) {
     try {
-      return onAuthStateChanged(auth, async (firebaseUser) => {
+      return onAuthStateChanged(auth, async (firebaseUser: any) => {
         if (firebaseUser) {
           const userData = await fetchOrCreateUserData(firebaseUser.uid, firebaseUser.displayName || 'Learner', firebaseUser.photoURL || undefined);
           callback(userData);
         } else {
           callback(null);
         }
-      }, (error) => {
+      }, (error: any) => {
         console.warn("Auth state error:", error);
         callback(null);
       });

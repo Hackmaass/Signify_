@@ -1,4 +1,4 @@
-import { FeedbackResponse, Lesson } from '../types';
+﻿import { FeedbackResponse, Lesson } from '../types';
 
 // Universal Safe Key Access (Works for Vite, Next.js, CRA, and Node)
 const getApiKey = () => {
@@ -7,18 +7,17 @@ const getApiKey = () => {
     // @ts-ignore
     if (import.meta && import.meta.env) {
       // @ts-ignore
-      if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
-      // @ts-ignore
       if (import.meta.env.VITE_GEMINI_API_KEY) return import.meta.env.VITE_GEMINI_API_KEY;
+      // @ts-ignore
+      if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
     }
   } catch (e) { }
 
   // 2. Try Process Env (Next.js / CRA / Node)
-  // We must check `typeof process` to avoid "ReferenceError: process is not defined" in Vite builds
   try {
     if (typeof process !== 'undefined' && process.env) {
-      if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
-      if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
+      if (process.env.VITE_GEMINI_API_KEY) return process.env.VITE_GEMINI_API_KEY;
+      if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) return process.env.NEXT_PUBLIC_GEMINI_API_KEY;
       if (process.env.API_KEY) return process.env.API_KEY;
     }
   } catch (e) { }
@@ -26,7 +25,8 @@ const getApiKey = () => {
   return '';
 };
 
-const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+// Using a standard, widely available model for the REST API to ensure stability.
+const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 // Fast & Spontaneous Analysis via REST
 export const evaluateHandSign = async (
@@ -37,7 +37,7 @@ export const evaluateHandSign = async (
 ): Promise<FeedbackResponse> => {
   try {
     const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key missing. Please set VITE_API_KEY in your environment.");
+    if (!apiKey) throw new Error("API Key missing. Please set VITE_GEMINI_API_KEY in your environment.");
 
     const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpeg);base64,/, "");
 

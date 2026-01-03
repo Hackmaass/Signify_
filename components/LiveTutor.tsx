@@ -20,9 +20,9 @@ const getApiKey = () => {
     // @ts-ignore
     if (import.meta && import.meta.env) {
       // @ts-ignore
-      if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
-      // @ts-ignore
       if (import.meta.env.VITE_GEMINI_API_KEY) return import.meta.env.VITE_GEMINI_API_KEY;
+      // @ts-ignore
+      if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
     }
   } catch (e) { }
 
@@ -30,8 +30,8 @@ const getApiKey = () => {
   // We must check `typeof process` to avoid "ReferenceError: process is not defined" in Vite builds
   try {
     if (typeof process !== 'undefined' && process.env) {
-      if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
-      if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
+      if (process.env.VITE_GEMINI_API_KEY) return process.env.VITE_GEMINI_API_KEY;
+      if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) return process.env.NEXT_PUBLIC_GEMINI_API_KEY;
       if (process.env.API_KEY) return process.env.API_KEY;
     }
   } catch (e) { }
@@ -165,7 +165,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const config = {
-        model: 'gemini-2.0-flash-exp', // Using the experiment model for Live API
+        model: 'gemini-2.5-flash-native-audio-preview-09-2025', // Correct model for Live API
         config: {
           responseModalities: [Modality.AUDIO],
           systemInstruction: {
@@ -511,8 +511,8 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             }}
             exit={{ width: 60, opacity: 0 }}
             className={`backdrop-blur-2xl border flex items-center justify-between px-2 overflow-hidden relative shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition-colors duration-500 ${error
-              ? 'bg-red-500/90 border-red-400/50'
-              : 'bg-white/90 dark:bg-[#0a0a0a]/90 border-zinc-200 dark:border-white/10'
+                ? 'bg-red-500/90 border-red-400/50'
+                : 'bg-white/90 dark:bg-[#0a0a0a]/90 border-zinc-200 dark:border-white/10'
               }`}
           >
             {/* Background Glow */}
