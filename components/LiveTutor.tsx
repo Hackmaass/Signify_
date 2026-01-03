@@ -137,7 +137,9 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
     }, 15000); // 15 seconds timeout
 
     try {
+      // Use standard v1alpha host if needed, but SDK handles it.
       const ai = new GoogleGenAI({ apiKey: apiKey });
+
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
 
@@ -151,23 +153,26 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const config = {
-        model: 'gemini-2.0-flash-exp', // Updated to public beta model to fix Network Error
+        model: 'gemini-2.0-flash-exp', // Known working model for Live API public access
         config: {
-          responseModalities: [Modality.AUDIO],
-          // INSTRUCTION: Crucial for "Speaking First"
-          systemInstruction: `You are "Signify", an expert ASL tutor.
+          responseModalities: [Modality.AUDIO], // Use Modality enum
+          systemInstruction: {
+            parts: [{
+              text: `You are "Signify", an expert ASL tutor.
           
-          CURRENT LESSON CONTEXT:
-          - Sign: "${lessonSign}"
-          - Visual Description: "${lessonDescription}"
+                CURRENT LESSON CONTEXT:
+                - Sign: "${lessonSign}"
+                - Visual Description: "${lessonDescription}"
 
-          PROTOCOL:
-          1. As soon as you connect, you MUST SPEAK FIRST. Do not wait for the user.
-          2. Say exactly: "Welcome! Let's practice the sign for ${lessonSign}. ${lessonDescription}"
-          3. I (The System) will send you "SYSTEM NOTIFICATIONS" when the user performs a sign.
-          4. When you receive a notification that the user SUCCEEDED, immediately congratulate them.
-          5. When you receive a notification that the user FAILED, I will give you the specific error. You must immediately explain how to fix it.
-          6. Keep all responses concise and encouraging.`,
+                PROTOCOL:
+                1. As soon as you connect, you MUST SPEAK FIRST. Do not wait for the user.
+                2. Say exactly: "Welcome! Let's practice the sign for ${lessonSign}. ${lessonDescription}"
+                3. I (The System) will send you "SYSTEM NOTIFICATIONS" when the user performs a sign.
+                4. When you receive a notification that the user SUCCEEDED, immediately congratulate them.
+                5. When you receive a notification that the user FAILED, I will give you the specific error. You must immediately explain how to fix it.
+                6. Keep all responses concise and encouraging.`
+            }]
+          },
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
           },
