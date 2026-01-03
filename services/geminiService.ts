@@ -1,19 +1,15 @@
 ﻿import { FeedbackResponse, Lesson } from '../types';
+import { GoogleGenAI } from "@google/genai";
 
-// Universal Safe Key Access (Works for Vite, Next.js, CRA, and Node)
+// Universal Safe Key Access
 const getApiKey = () => {
-  // 1. Try Vite (Client-side) - Preferred for this project
   try {
     // @ts-ignore
-    if (import.meta && import.meta.env) {
-      // @ts-ignore
-      if (import.meta.env.VITE_GEMINI_API_KEY) return import.meta.env.VITE_GEMINI_API_KEY;
-      // @ts-ignore
-      if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
-    }
+    if (import.meta?.env?.VITE_GEMINI_API_KEY) return import.meta.env.VITE_GEMINI_API_KEY;
+    // @ts-ignore
+    if (import.meta?.env?.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
   } catch (e) { }
 
-  // 2. Try Process Env (Next.js / CRA / Node)
   try {
     if (typeof process !== 'undefined' && process.env) {
       if (process.env.VITE_GEMINI_API_KEY) return process.env.VITE_GEMINI_API_KEY;
@@ -25,10 +21,16 @@ const getApiKey = () => {
   return '';
 };
 
-// Using gemini-1.5-flash for better availability and free-tier stability
-const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+// Initialize the SDK Client
+const getClient = () => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("API Key missing. Please set VITE_GEMINI_API_KEY in your environment.");
+  return new GoogleGenAI({ apiKey });
+};
 
-// Fast & Spontaneous Analysis via REST
+const DEFAULT_MODEL = "gemini-1.5-flash-latest";
+
+// Fast & Spontaneous Analysis via SDK
 export const evaluateHandSign = async (
   imageBase64: string,
   targetSign: string,
@@ -36,9 +38,7 @@ export const evaluateHandSign = async (
   signType: 'static' | 'dynamic' = 'static'
 ): Promise<FeedbackResponse> => {
   try {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key missing. Please set VITE_GEMINI_API_KEY in your environment.");
-
+    const ai = getClient();
     const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpeg);base64,/, "");
 
     const prompt = `
@@ -63,16 +63,18 @@ export const evaluateHandSign = async (
       }
     `;
 
-    const body = {
+    const response = await ai.models.generateContent({
+      model: DEFAULT_MODEL,
       contents: [{
         parts: [
-          { inline_data: { mime_type: "image/png", data: cleanBase64 } },
+          { inlineData: { mimeType: "image/png", data: cleanBase64 } },
           { text: prompt }
         ]
       }],
-      generationConfig: {
-        response_mime_type: "application/json",
-        response_schema: {
+      config: {
+        responseMimeType: "application/json",
+        // @ts-ignore
+        responseSchema: {
           type: "OBJECT",
           properties: {
             score: { type: "INTEGER" },
@@ -82,49 +84,29 @@ export const evaluateHandSign = async (
           required: ["score", "feedback", "isCorrect"]
         }
       }
-    };
-
-    const response = await fetch(`${BASE_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
     });
 
-    if (!response.ok) {
-      // Enhanced error handling for quota issues
-      if (response.status === 429) {
-        throw new Error(`⚠️ API Quota Exceeded. Your Gemini API has hit its daily limit. Please wait until midnight PT (1:30 PM IST) for quota reset, or upgrade to a paid plan.`);
-      } else if (response.status === 403) {
-        throw new Error(`🔒 Invalid API Key. Please check your VITE_GEMINI_API_KEY in .env.local`);
-      }
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
+    const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) throw new Error("No response content");
     return JSON.parse(text) as FeedbackResponse;
 
   } catch (error: any) {
     console.error("Gemini Vision Error:", error);
-    // Check if it's a quota error
-    const isQuotaError = error.message?.includes('Quota Exceeded') || error.message?.includes('429');
+    const isQuotaError = error.message?.includes('429') || error.status === 429;
     return {
       score: 0,
       feedback: isQuotaError
-        ? "⚠️ API Quota Exceeded - Wait or upgrade your plan"
-        : error.message || "Analysis failed. Try again.",
+        ? "⚠️ API Quota Exceeded - Wait or upgrade"
+        : error.message || "Analysis failed.",
       isCorrect: false
     };
   }
 };
 
-// Generates a lesson plan from a raw sentence via REST
+// Generates a lesson plan from a raw sentence
 export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> => {
   try {
-    const apiKey = getApiKey();
-    if (!apiKey) return [];
+    const ai = getClient();
 
     const prompt = `
       You are an ASL Teacher. Convert the sentence "${sentence}" into a sequence of ASL signs (Gloss).
@@ -140,18 +122,20 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
       }
     `;
 
-    const body = {
+    const response = await ai.models.generateContent({
+      model: DEFAULT_MODEL,
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        response_mime_type: "application/json",
-        response_schema: {
+      config: {
+        responseMimeType: "application/json",
+        // @ts-ignore
+        responseSchema: {
           type: "ARRAY",
           items: {
             type: "OBJECT",
             properties: {
               sign: { type: "STRING" },
-              type: { type: "STRING", enum: ["static", "dynamic"] },
-              difficulty: { type: "STRING", enum: ["Easy", "Medium", "Hard"] },
+              type: { type: "STRING" },
+              difficulty: { type: "STRING" },
               description: { type: "STRING" },
               instruction: { type: "STRING" }
             },
@@ -159,36 +143,15 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
           }
         }
       }
-    };
-
-    const response = await fetch(`${BASE_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("Gemini API Error details:", errorData);
-      throw new Error(`API Failed with status ${response.status}: ${errorData.error?.message || response.statusText}`);
-    }
-
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!text) {
-      console.warn("Gemini response empty. Full data:", data);
-      return [];
-    }
+    const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) return [];
 
     const rawData = JSON.parse(text);
 
-    // Map to Lesson interface
     return rawData.map((item: any, index: number) => {
-      // Smart Image Selection
       let imageUrl = `https://placehold.co/400x400/27272a/FFFFFF/png?text=${encodeURIComponent(item.sign)}&font=roboto`;
-
-      // If it is a single letter, use the stable Wikimedia URL
       if (item.sign.length === 1 && /^[A-Za-z]$/.test(item.sign)) {
         imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/Sign_language_${item.sign.toUpperCase()}.svg?width=500`;
       }
@@ -207,40 +170,30 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
 
   } catch (error: any) {
     console.error("Lesson Gen Error:", error);
-    throw error; // Throw the error so the UI can catch and display it
+    throw error;
   }
 };
 
-// Generates speech via REST using audio modalities
+// Generates speech via SDK
 export const generateSpeech = async (text: string): Promise<string | null> => {
   try {
-    const apiKey = getApiKey();
-    if (!apiKey) return null;
-
-    const body = {
+    const ai = getClient();
+    const response = await ai.models.generateContent({
+      model: DEFAULT_MODEL,
       contents: [{ parts: [{ text }] }],
-      generationConfig: {
-        response_modalities: ["AUDIO"],
-        speech_config: {
-          voice_config: {
-            prebuilt_voice_config: { voice_name: 'Kore' },
+      config: {
+        // @ts-ignore
+        responseModalities: ["AUDIO"],
+        // @ts-ignore
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
           },
         },
       }
-    };
-
-    const response = await fetch(`${BASE_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
     });
 
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    const audioData = data.candidates?.[0]?.content?.parts?.[0]?.inline_data?.data;
-
-    return audioData || null;
+    return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
 
   } catch (e) {
     console.error("TTS Generation Error:", e);

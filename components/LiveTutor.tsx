@@ -165,7 +165,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const config = {
-        model: 'gemini-2.5-flash-native-audio-preview-09-2025', // Correct model for Live API
+        model: 'models/gemini-2.0-flash-exp', // Correct canonical model for Live API v1beta
         config: {
           responseModalities: [Modality.AUDIO],
           systemInstruction: {
@@ -438,8 +438,22 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
 
       try {
         console.log("Sending feedback to Live Tutor:", feedback.isCorrect ? "Success" : "Correction");
-        // Use parts array directly and turnComplete=true to force a response
-        sessionRef.current.send([{ text: prompt }], true);
+        const session = sessionRef.current;
+        const msg = { parts: [{ text: prompt }] };
+
+        // Try 'send' first (correct for newer SDK versions)
+        if (typeof session.send === 'function') {
+          session.send(msg, true);
+        } else if (typeof session.sendClientContent === 'function') {
+          session.sendClientContent(msg, true);
+        } else {
+          console.warn("Session method mismatch. Available keys:", Object.keys(session));
+          // Fallback to sending as realtime input if supported
+          if (typeof session.sendRealtimeInput === 'function') {
+            // Some versions might support text in realtime input
+            session.sendRealtimeInput({ media: { mimeType: 'text/plain', data: btoa(prompt) } });
+          }
+        }
       } catch (e) {
         console.warn("Failed to send feedback text to Gemini Live:", e);
       }
