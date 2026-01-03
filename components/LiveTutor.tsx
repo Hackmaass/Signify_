@@ -313,26 +313,43 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
       source.connect(processor);
       processor.connect(inputCtx.destination);
 
-      // --- Setup Video Stream ---
+      // --- Setup Video Stream (OPTIMIZED FOR API EFFICIENCY) ---
       if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
       videoIntervalRef.current = window.setInterval(() => {
-        // Gate video input as well to prevent interruption
+        // Gate video input to prevent interruption AND reduce API calls
         if (!activeRef.current || !audioStreamingEnabledRef.current) return;
 
         const snapshot = canvasRef.current?.getSnapshot();
         if (snapshot) {
           const base64Data = snapshot.split(',')[1];
-          sessionPromise.then(async (session) => {
-            if (activeRef.current && sessionRef.current === session) {
-              try {
-                await session.sendRealtimeInput({
-                  media: { mimeType: 'image/jpeg', data: base64Data }
-                });
-              } catch (e) { }
+
+          // Compress image before sending to reduce payload size
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            // Aggressive compression: 320x180 resolution
+            canvas.width = 320;
+            canvas.height = 180;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, 320, 180);
+              // Very low quality to minimize data transfer (30%)
+              const compressedData = canvas.toDataURL('image/jpeg', 0.3).split(',')[1];
+
+              sessionPromise.then(async (session) => {
+                if (activeRef.current && sessionRef.current === session) {
+                  try {
+                    await session.sendRealtimeInput({
+                      media: { mimeType: 'image/jpeg', data: compressedData }
+                    });
+                  } catch (e) { }
+                }
+              }).catch(() => { });
             }
-          }).catch(() => { });
+          };
+          img.src = snapshot;
         }
-      }, 500);
+      }, 5000); // Send 1 frame every 5 seconds (was 500ms) = 90% reduction in video requests
 
     } catch (error: any) {
       console.error("Connection setup failed", error);
@@ -511,8 +528,8 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             }}
             exit={{ width: 60, opacity: 0 }}
             className={`backdrop-blur-2xl border flex items-center justify-between px-2 overflow-hidden relative shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition-colors duration-500 ${error
-                ? 'bg-red-500/90 border-red-400/50'
-                : 'bg-white/90 dark:bg-[#0a0a0a]/90 border-zinc-200 dark:border-white/10'
+              ? 'bg-red-500/90 border-red-400/50'
+              : 'bg-white/90 dark:bg-[#0a0a0a]/90 border-zinc-200 dark:border-white/10'
               }`}
           >
             {/* Background Glow */}

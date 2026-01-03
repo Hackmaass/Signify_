@@ -91,7 +91,13 @@ export const evaluateHandSign = async (
     });
 
     if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
+      // Enhanced error handling for quota issues
+      if (response.status === 429) {
+        throw new Error(`⚠️ API Quota Exceeded. Your Gemini API has hit its daily limit. Please wait until midnight PT (1:30 PM IST) for quota reset, or upgrade to a paid plan.`);
+      } else if (response.status === 403) {
+        throw new Error(`🔒 Invalid API Key. Please check your VITE_GEMINI_API_KEY in .env.local`);
+      }
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
@@ -100,11 +106,15 @@ export const evaluateHandSign = async (
     if (!text) throw new Error("No response content");
     return JSON.parse(text) as FeedbackResponse;
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Vision Error:", error);
+    // Check if it's a quota error
+    const isQuotaError = error.message?.includes('Quota Exceeded') || error.message?.includes('429');
     return {
       score: 0,
-      feedback: "Analysis failed. Try again.",
+      feedback: isQuotaError
+        ? "⚠️ API Quota Exceeded - Wait or upgrade your plan"
+        : error.message || "Analysis failed. Try again.",
       isCorrect: false
     };
   }
