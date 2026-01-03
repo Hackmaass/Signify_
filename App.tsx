@@ -6,7 +6,7 @@ import StreakCalendar from './components/StreakCalendar';
 import LessonView from './components/LessonView';
 import LoginPage from './components/LoginPage';
 import Dock from './components/Dock';
-import { Play, LogOut, Home, Activity, Moon, Sun, BookOpen, LogIn, Loader2, Sparkles, Wand2, User as UserIcon } from 'lucide-react';
+import { Play, LogOut, Home, Activity, Moon, Sun, BookOpen, LogIn, Loader2, Sparkles, Wand2, User as UserIcon, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 
 // --- DATA DEFINITIONS ---
@@ -57,13 +57,22 @@ export default function App() {
         return onAuthStateChange((userData) => { setUser(userData); setLoading(false); });
     }, []);
 
+    const [genError, setGenError] = useState<string | null>(null);
     const handleGenerateLesson = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!customInput.trim()) return;
         setIsGenerating(true);
-        const lessons = await generateLessonPlan(customInput);
-        setGeneratedLessons(lessons);
-        setIsGenerating(false);
+        setGenError(null);
+        try {
+            const lessons = await generateLessonPlan(customInput);
+            if (lessons.length === 0) setGenError("No lessons generated. Try a different phrase.");
+            setGeneratedLessons(lessons);
+        } catch (err: any) {
+            console.error("Generation Error:", err);
+            setGenError(err.message || "Failed to generate lessons. Please check your connection or API quota.");
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     const startLesson = (lessons: Lesson[]) => {
@@ -224,6 +233,17 @@ export default function App() {
                                                                     Generate
                                                                 </button>
                                                             </form>
+
+                                                            {genError && (
+                                                                <motion.div
+                                                                    initial={{ opacity: 0, scale: 0.95 }}
+                                                                    animate={{ opacity: 1, scale: 1 }}
+                                                                    className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400 text-sm"
+                                                                >
+                                                                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                                                                    <p>{genError}</p>
+                                                                </motion.div>
+                                                            )}
                                                         </div>
 
                                                         {generatedLessons.length > 0 && (

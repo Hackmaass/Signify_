@@ -205,9 +205,9 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
       };
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Lesson Gen Error:", error);
-    return [];
+    throw error; // Throw the error so the UI can catch and display it
   }
 };
 
