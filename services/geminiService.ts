@@ -2,26 +2,28 @@ import { FeedbackResponse, Lesson } from '../types';
 
 // Universal Safe Key Access (Works for Vite, Next.js, CRA, and Node)
 const getApiKey = () => {
-  let key = '';
-
-  // 1. Try Vite (Client-side)
+  // 1. Try Vite (Client-side) - Preferred for this project
   try {
     // @ts-ignore
-    if (import.meta.env?.VITE_API_KEY) key = import.meta.env.VITE_API_KEY;
-    // @ts-ignore
-    else if (import.meta.env?.VITE_GEMINI_API_KEY) key = import.meta.env.VITE_GEMINI_API_KEY;
+    if (import.meta && import.meta.env) {
+      // @ts-ignore
+      if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
+      // @ts-ignore
+      if (import.meta.env.VITE_GEMINI_API_KEY) return import.meta.env.VITE_GEMINI_API_KEY;
+    }
   } catch (e) { }
-
-  if (key) return key;
 
   // 2. Try Process Env (Next.js / CRA / Node)
+  // We must check `typeof process` to avoid "ReferenceError: process is not defined" in Vite builds
   try {
-    if (process.env.NEXT_PUBLIC_API_KEY) key = process.env.NEXT_PUBLIC_API_KEY;
-    else if (process.env.REACT_APP_API_KEY) key = process.env.REACT_APP_API_KEY;
-    else if (process.env.API_KEY) key = process.env.API_KEY;
+    if (typeof process !== 'undefined' && process.env) {
+      if (process.env.NEXT_PUBLIC_API_KEY) return process.env.NEXT_PUBLIC_API_KEY;
+      if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
+      if (process.env.API_KEY) return process.env.API_KEY;
+    }
   } catch (e) { }
 
-  return key;
+  return '';
 };
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
@@ -35,7 +37,7 @@ export const evaluateHandSign = async (
 ): Promise<FeedbackResponse> => {
   try {
     const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key missing. Please set VITE_API_KEY or NEXT_PUBLIC_API_KEY.");
+    if (!apiKey) throw new Error("API Key missing. Please set VITE_API_KEY in your environment.");
 
     const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpeg);base64,/, "");
 
