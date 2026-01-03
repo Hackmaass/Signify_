@@ -137,7 +137,6 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
     }, 15000); // 15 seconds timeout
 
     try {
-      // Use standard v1alpha host if needed, but SDK handles it.
       const ai = new GoogleGenAI({ apiKey: apiKey });
 
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
@@ -153,9 +152,9 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const config = {
-        model: 'gemini-2.0-flash-exp', // Known working model for Live API public access
+        model: 'gemini-2.0-flash-exp', // Using the experiment model for Live API
         config: {
-          responseModalities: [Modality.AUDIO], // Use Modality enum
+          responseModalities: [Modality.AUDIO],
           systemInstruction: {
             parts: [{
               text: `You are "Signify", an expert ASL tutor.
@@ -167,10 +166,10 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
                 PROTOCOL:
                 1. As soon as you connect, you MUST SPEAK FIRST. Do not wait for the user.
                 2. Say exactly: "Welcome! Let's practice the sign for ${lessonSign}. ${lessonDescription}"
-                3. I (The System) will send you "SYSTEM NOTIFICATIONS" when the user performs a sign.
-                4. When you receive a notification that the user SUCCEEDED, immediately congratulate them.
-                5. When you receive a notification that the user FAILED, I will give you the specific error. You must immediately explain how to fix it.
-                6. Keep all responses concise and encouraging.`
+                3. I (The System) will send you "SYSTEM NOTIFICATIONS" regarding the user's performance.
+                4. IMPORTANT: If you receive a notification that the user SUCCEEDED, you MUST interrupt yourself and immediately congratulate them enthusiastically. Say something like "Great job!" or "Perfect!".
+                5. If you receive a notification that the user FAILED, explain the specific error provided in the notification.
+                6. Keep all responses concise (under 2 sentences).`
             }]
           },
           speechConfig: {
@@ -397,21 +396,23 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
   useEffect(() => {
     if (activeRef.current && sessionRef.current && feedback) {
       const prompt = feedback.isCorrect
-        ? `[SYSTEM NOTIFICATION]: The user just COMPLETED the sign "${lessonSign}" CORRECTLY. \n\nACTION REQUIRED: Immediately speak to the user. Congratulate them enthusiastically on getting it right. Keep it brief (1 sentence).`
-        : `[SYSTEM NOTIFICATION]: The user just attempted the sign "${lessonSign}" but made a MISTAKE. \n\nError Analysis: "${feedback.feedback}". \n\nACTION REQUIRED: Immediately speak to the user. Do not say "System notification". Directly address the user and explain exactly how to fix their hand shape based on the Error Analysis above. Be helpful and encouraging.`;
+        ? `[SYSTEM NOTIFICATION]: The user just COMPLETED the sign "${lessonSign}" CORRECTLY. \n\nACTION REQUIRED: Immediately speak to the user. Congratulate them enthusiastically on getting it right. Say "Great job!" or similar.`
+        : `[SYSTEM NOTIFICATION]: The user just attempted the sign "${lessonSign}" but made a MISTAKE. \n\nError Analysis: "${feedback.feedback}". \n\nACTION REQUIRED: Immediately speak to the user. Explain exactly how to fix their hand shape.`;
 
+      // Temporarily mute user input to let the AI speak without interruption
       audioStreamingEnabledRef.current = false;
 
       try {
-        console.log("Triggering AI Tutor Feedback:", feedback.isCorrect ? "Success" : "Correction");
-        sessionRef.current.send({ parts: [{ text: prompt }] }, true);
+        console.log("Sending feedback to Live Tutor:", feedback.isCorrect ? "Success" : "Correction");
+        // Use parts array directly and turnComplete=true to force a response
+        sessionRef.current.send([{ text: prompt }], true);
       } catch (e) {
         console.warn("Failed to send feedback text to Gemini Live:", e);
       }
 
       setTimeout(() => {
         if (activeRef.current) audioStreamingEnabledRef.current = true;
-      }, 3000);
+      }, 4000);
     }
   }, [feedback, lessonSign]);
 
@@ -497,8 +498,8 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             }}
             exit={{ width: 60, opacity: 0 }}
             className={`backdrop-blur-2xl border flex items-center justify-between px-2 overflow-hidden relative shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] transition-colors duration-500 ${error
-                ? 'bg-red-500/90 border-red-400/50'
-                : 'bg-white/90 dark:bg-[#0a0a0a]/90 border-zinc-200 dark:border-white/10'
+              ? 'bg-red-500/90 border-red-400/50'
+              : 'bg-white/90 dark:bg-[#0a0a0a]/90 border-zinc-200 dark:border-white/10'
               }`}
           >
             {/* Background Glow */}

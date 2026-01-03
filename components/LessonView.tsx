@@ -81,12 +81,8 @@ const LessonView: React.FC<Props> = ({ lesson, user, onBack, onComplete, hasNext
       if (result.isCorrect) {
         const updatedUser = await updateStreak(user);
         setVerifyDuration(5000);
-        // EXTENDED DELAY: Wait 4s before moving on so the AI can finish complimenting
-        if (hasNext) {
-          setTimeout(() => onComplete(updatedUser), 4000);
-        } else {
-          setTimeout(() => onComplete(updatedUser), 4000);
-        }
+        // EXTENDED DELAY: Wait 5.5s before moving on so the AI can finish complimenting
+        setTimeout(() => onComplete(updatedUser), 5500);
       }
     }
     setIsProcessing(false);
