@@ -25,8 +25,8 @@ const getApiKey = () => {
   return '';
 };
 
-// Using a standard, widely available model for the REST API to ensure stability.
-const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+// Using gemini-1.5-flash for better availability and free-tier stability
+const BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
 // Fast & Spontaneous Analysis via REST
 export const evaluateHandSign = async (
@@ -167,12 +167,19 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
       body: JSON.stringify(body)
     });
 
-    if (!response.ok) throw new Error("API Failed");
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error("Gemini API Error details:", errorData);
+      throw new Error(`API Failed with status ${response.status}: ${errorData.error?.message || response.statusText}`);
+    }
 
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (!text) return [];
+    if (!text) {
+      console.warn("Gemini response empty. Full data:", data);
+      return [];
+    }
 
     const rawData = JSON.parse(text);
 

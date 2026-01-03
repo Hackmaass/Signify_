@@ -199,7 +199,8 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             console.log('Gemini Live Socket Opened');
             if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
             setIsConnected(true);
-            setError(null);
+            setError(null); // Clear any stale errors from previous sessions
+            setIsActive(true); // Ensure active state is synced
           },
           onmessage: async (msg: LiveServerMessage) => {
             if (!activeRef.current) return;
@@ -229,11 +230,14 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             console.log("Gemini Live Socket Closed", e);
             sessionRef.current = null; // CRITICAL: Mark session as dead immediately
             setIsConnected(false);
-            // Only set error if it wasn't a manual disconnect
+            // Only set error if it wasn't a manual disconnect AND we're still supposed to be active
+            // Don't show errors during normal reconnection attempts
             if (activeRef.current) {
               const code = e.code || 'Unknown';
+              // Don't show error for normal closure (1000)
               if (code === 1000) {
-                setError("Session Ended");
+                // Normal closure - don't show error unless we didn't expect it
+                console.log("Session ended normally");
               } else if (code === 1011) {
                 setError("API Quota Exceeded");
               } else if (code === 1006) {

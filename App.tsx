@@ -87,9 +87,18 @@ export default function App() {
         e.preventDefault();
         if (!customInput.trim()) return;
         setIsGenerating(true);
-        const lessons = await generateLessonPlan(customInput);
-        setGeneratedLessons(lessons);
-        setIsGenerating(false);
+        try {
+            const lessons = await generateLessonPlan(customInput);
+            if (lessons.length === 0) {
+                alert("Could not generate lessons. This might be due to API limits or invalid input. Try a shorter sentence.");
+            }
+            setGeneratedLessons(lessons);
+        } catch (err: any) {
+            console.error("Generation Error:", err);
+            alert(`Failed to generate lesson: ${err.message || 'Unknown error'}`);
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     const startLesson = (lessons: Lesson[], startIndex: number = 0) => {
