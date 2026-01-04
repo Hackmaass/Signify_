@@ -1,3 +1,11 @@
+import React, { useState, useEffect } from 'react';
+import { UserData, Lesson, LessonCategory } from './types';
+import { signOut, onAuthStateChange } from './services/firebaseService';
+import { generateLessonPlan } from './services/geminiService';
+import StreakCalendar from './components/StreakCalendar';
+import LessonView from './components/LessonView';
+import LoginPage from './components/LoginPage';
+import Dock from './components/Dock';
 import { Play, LogOut, Home, Activity, Moon, Sun, BookOpen, LogIn, Loader2, Wand2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 
@@ -15,17 +23,16 @@ const ALPHABET_LESSONS: Lesson[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('').map((c
     letter: char,
     description: char === 'J' ? "Trace a 'J' in the air." : char === 'Z' ? "Trace a 'Z' in the air." : `Sign for letter ${char}`,
     imageUrl: getStableWikiUrl(char),
-    difficulty: ['A', 'B', 'C', 'E', 'F', 'I', 'L', 'O', 'U', 'V'].includes(char) ? 'Easy' : 'Medium',
-    visualGuide: char === 'J' ? 'motion_circle' : char === 'Z' ? 'motion_shake' : 'none'
+    difficulty: ['A', 'B', 'C', 'E', 'F', 'I', 'L', 'O', 'U', 'V'].includes(char) ? 'Easy' : 'Medium'
 }));
 
 const PHRASE_LESSONS: Lesson[] = [
-    { id: 'p1', category: 'phrase', type: 'dynamic', letter: 'Thank You', description: 'Hand moves from chin forward.', imageUrl: 'https://placehold.co/600x600/18181b/FFFFFF/png?text=Thank+You&font=roboto', difficulty: 'Easy', visualGuide: 'motion_forward' },
-    { id: 'p2', category: 'phrase', type: 'dynamic', letter: 'Please', description: 'Circular motion on chest.', imageUrl: 'https://placehold.co/600x600/18181b/FFFFFF/png?text=Please&font=roboto', difficulty: 'Easy', visualGuide: 'motion_circle' },
-    { id: 'p3', category: 'phrase', type: 'dynamic', letter: 'Help', description: 'Fist on palm, lifting up.', imageUrl: 'https://placehold.co/600x600/18181b/FFFFFF/png?text=Help&font=roboto', difficulty: 'Medium', visualGuide: 'motion_up' },
-    { id: 'p4', category: 'phrase', type: 'dynamic', letter: 'Yes', description: 'Fist nodding like a head.', imageUrl: 'https://placehold.co/600x600/18181b/FFFFFF/png?text=Yes&font=roboto', difficulty: 'Easy', visualGuide: 'motion_nod' },
-    { id: 'p5', category: 'phrase', type: 'dynamic', letter: 'No', description: 'Index/Middle tap thumb.', imageUrl: 'https://placehold.co/600x600/18181b/FFFFFF/png?text=No&font=roboto', difficulty: 'Easy', visualGuide: 'motion_shake' },
-    { id: 'p6', category: 'phrase', type: 'dynamic', letter: 'Hello', description: 'Salute from forehead.', imageUrl: 'https://placehold.co/600x600/18181b/FFFFFF/png?text=Hello&font=roboto', difficulty: 'Easy', visualGuide: 'motion_forward' },
+    { id: 'p1', category: 'phrase', type: 'dynamic', letter: 'Thank You', description: 'Hand moves from chin forward.', imageUrl: 'https://placehold.co/600x600/18181b/FFFFFF/png?text=Thank+You&font=roboto', difficulty: 'Easy' },
+    { id: 'p2', category: 'phrase', type: 'dynamic', letter: 'Please', description: 'Circular motion on chest.', imageUrl: 'https://placehold.co/600x600/18181b/FFFFFF/png?text=Please&font=roboto', difficulty: 'Easy' },
+    { id: 'p3', category: 'phrase', type: 'dynamic', letter: 'Help', description: 'Fist on palm, lifting up.', imageUrl: 'https://placehold.co/600x600/18181b/FFFFFF/png?text=Help&font=roboto', difficulty: 'Medium' },
+    { id: 'p4', category: 'phrase', type: 'dynamic', letter: 'Yes', description: 'Fist nodding like a head.', imageUrl: 'https://placehold.co/600x600/18181b/FFFFFF/png?text=Yes&font=roboto', difficulty: 'Easy' },
+    { id: 'p5', category: 'phrase', type: 'dynamic', letter: 'No', description: 'Index/Middle tap thumb.', imageUrl: 'https://placehold.co/600x600/18181b/FFFFFF/png?text=No&font=roboto', difficulty: 'Easy' },
+    { id: 'p6', category: 'phrase', type: 'dynamic', letter: 'Hello', description: 'Salute from forehead.', imageUrl: 'https://placehold.co/600x600/18181b/FFFFFF/png?text=Hello&font=roboto', difficulty: 'Easy' },
 ];
 
 export default function App() {
@@ -46,6 +53,10 @@ export default function App() {
     }, [theme]);
 
     const [genError, setGenError] = useState<string | null>(null);
+
+    useEffect(() => {
+        return onAuthStateChange((userData) => { setUser(userData); setLoading(false); });
+    }, []);
 
     // Clear state when switching tabs
     useEffect(() => {
@@ -274,7 +285,13 @@ export default function App() {
 
 // --- Card Components ---
 
-const Card = ({ lesson, index, onClick }: { lesson: Lesson, index: number, onClick: () => void }) => (
+interface CardProps {
+    lesson: Lesson;
+    index: number;
+    onClick: () => void;
+}
+
+const Card: React.FC<CardProps> = ({ lesson, index, onClick }) => (
     <motion.div
         layout
         whileHover={{ y: -5 }}
@@ -308,7 +325,7 @@ const Card = ({ lesson, index, onClick }: { lesson: Lesson, index: number, onCli
     </motion.div>
 );
 
-const PhraseCard = ({ lesson, index, onClick }: { lesson: Lesson, index: number, onClick: () => void }) => (
+const PhraseCard: React.FC<CardProps> = ({ lesson, index, onClick }) => (
     <motion.div
         layout
         whileHover={{ y: -5 }}
