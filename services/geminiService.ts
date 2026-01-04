@@ -25,10 +25,10 @@ const getApiKey = () => {
 const getClient = () => {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("API Key missing. Please set VITE_GEMINI_API_KEY in your environment.");
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({ apiKey, apiVersion: 'v1' });
 };
 
-const DEFAULT_MODEL = "gemini-2.0-flash-exp";
+const DEFAULT_MODEL = "models/gemini-2.0-flash-exp";
 
 // Fast & Spontaneous Analysis via SDK
 export const evaluateHandSign = async (
@@ -157,7 +157,7 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
       }
 
       return {
-        id: `custom-${Date.now()}-${index}`,
+        id: `custom-${Date.now()}-${index}-${Math.floor(Math.random() * 1000)}`,
         category: 'custom',
         type: item.type || (item.sign.length === 1 ? 'static' : 'dynamic'),
         letter: item.sign,

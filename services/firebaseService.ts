@@ -267,19 +267,16 @@ export const getUserData = async (): Promise<UserData | null> => {
 export const updateStreak = async (user: UserData): Promise<UserData> => {
   const today = new Date().toISOString().split('T')[0];
 
-  if (user.history[today]) {
-    return user;
-  }
 
-  const newHistory = { ...user.history, [today]: true };
   const lastDate = user.lastPracticeDate.split('T')[0];
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-
   let newStreak = user.streak;
-  if (lastDate === yesterday) {
-    newStreak += 1;
-  } else if (lastDate !== today) {
-    newStreak = 1;
+  if (!user.history[today]) {
+    if (lastDate === yesterday) {
+      newStreak += 1;
+    } else if (lastDate !== today) {
+      newStreak = 1;
+    }
   }
   if (newStreak === 0) newStreak = 1;
 
@@ -288,7 +285,7 @@ export const updateStreak = async (user: UserData): Promise<UserData> => {
     streak: newStreak,
     lastPracticeDate: new Date().toISOString(),
     totalLessons: user.totalLessons + 1,
-    history: newHistory
+    history: { ...user.history, [today]: true }
   };
 
   const key = getStorageKey(user.uid);
