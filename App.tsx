@@ -1,12 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { UserData, Lesson, LessonCategory } from './types';
-import { signOut, onAuthStateChange } from './services/firebaseService';
-import { generateLessonPlan } from './services/geminiService';
-import StreakCalendar from './components/StreakCalendar';
-import LessonView from './components/LessonView';
-import LoginPage from './components/LoginPage';
-import Dock from './components/Dock';
-import { Play, LogOut, Home, Activity, Moon, Sun, BookOpen, LogIn, Loader2, Sparkles, Wand2, User as UserIcon } from 'lucide-react';
+import { Play, LogOut, Home, Activity, Moon, Sun, BookOpen, LogIn, Loader2, Wand2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 
 // --- DATA DEFINITIONS ---
@@ -53,17 +45,30 @@ export default function App() {
         root.classList.add(theme);
     }, [theme]);
 
+    const [genError, setGenError] = useState<string | null>(null);
+
+    // Clear state when switching tabs
     useEffect(() => {
-        return onAuthStateChange((userData) => { setUser(userData); setLoading(false); });
-    }, []);
+        setGenError(null);
+        setCustomInput('');
+    }, [activeTab]);
+
 
     const handleGenerateLesson = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!customInput.trim()) return;
         setIsGenerating(true);
-        const lessons = await generateLessonPlan(customInput);
-        setGeneratedLessons(lessons);
-        setIsGenerating(false);
+        setGenError(null);
+        try {
+            const lessons = await generateLessonPlan(customInput);
+            if (lessons.length === 0) setGenError("No lessons generated. Try a different phrase.");
+            setGeneratedLessons(lessons);
+        } catch (err: any) {
+            console.error("Generation Error:", err);
+            setGenError(err.message || "Failed to generate lessons. Please check your connection or API quota.");
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     const startLesson = (lessons: Lesson[]) => {
@@ -84,7 +89,14 @@ export default function App() {
     const dockItems = [
         { label: 'Home', icon: <Home />, onClick: () => { setLessonQueue([]); setCurrentQueueIndex(-1); } },
         { label: 'Lessons', icon: <BookOpen />, onClick: () => setActiveTab('alphabet') },
-        { label: 'Progress', icon: <Activity />, onClick: () => { } },
+        {
+            label: 'Progress',
+            icon: <Activity />,
+            onClick: () => {
+                const calendar = document.getElementById('streak-calendar');
+                if (calendar) calendar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        },
         { label: theme === 'dark' ? 'Light' : 'Dark', icon: theme === 'dark' ? <Sun /> : <Moon />, onClick: () => setTheme(prev => prev === 'dark' ? 'light' : 'dark') },
     ];
 
@@ -150,7 +162,7 @@ export default function App() {
                                                 <h2 className="text-zinc-500 font-medium mb-2 text-lg">Welcome back, {user.displayName || 'Learner'}</h2>
                                                 <h1 className="text-6xl lg:text-7xl font-bold tracking-tighter text-zinc-900 dark:text-white drop-shadow-sm">Dashboard</h1>
                                             </div>
-                                            <div className="w-full lg:w-auto">
+                                            <div id="streak-calendar" className="w-full lg:w-auto">
                                                 <StreakCalendar user={user} />
                                             </div>
                                         </header>
@@ -162,7 +174,7 @@ export default function App() {
                                                     <button
                                                         key={tab}
                                                         onClick={() => setActiveTab(tab as LessonCategory)}
-                                                        className={`relative px-10 py-3 rounded-xl text-sm font-bold transition-all duration-300 z-10 ${activeTab === tab ? 'text-white dark:text-black' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
+                                                        className={`relative px-10 py-3 rounded-xl text-sm font-bold transition-all duration-300 z-10 ${activeTab === tab ? 'text-white dark:text-zinc-900' : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
                                                             }`}
                                                     >
                                                         {tab === 'custom' ? 'AI Generator' : `${tab.charAt(0).toUpperCase() + tab.slice(1)}s`}
@@ -214,6 +226,7 @@ export default function App() {
                                                                     value={customInput}
                                                                     onChange={(e) => setCustomInput(e.target.value)}
                                                                     placeholder="e.g. Nice to meet you"
+                                                                    aria-label="Prompt for AI lesson generation"
                                                                     className="flex-1 bg-zinc-100 dark:bg-black/50 border border-zinc-200 dark:border-white/10 rounded-xl px-6 py-4 text-zinc-900 dark:text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                                                                 />
                                                                 <button
@@ -224,6 +237,17 @@ export default function App() {
                                                                     Generate
                                                                 </button>
                                                             </form>
+
+                                                            {genError && (
+                                                                <motion.div
+                                                                    initial={{ opacity: 0, scale: 0.95 }}
+                                                                    animate={{ opacity: 1, scale: 1 }}
+                                                                    className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-500 dark:text-red-400 text-sm"
+                                                                >
+                                                                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                                                                    <p className="font-medium">{genError}</p>
+                                                                </motion.div>
+                                                            )}
                                                         </div>
 
                                                         {generatedLessons.length > 0 && (
@@ -260,7 +284,7 @@ const Card = ({ lesson, index, onClick }: { lesson: Lesson, index: number, onCli
         {/* Header */}
         <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-20">
             <span className="text-[10px] font-bold text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300 transition-colors">{(index + 1).toString().padStart(2, '0')}</span>
-            <div className={`w-2 h-2 rounded-full ${lesson.difficulty === 'Easy' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            <div className={`w-2 h-2 rounded-full ${lesson.difficulty === 'Easy' ? 'bg-emerald-500' : lesson.difficulty === 'Hard' ? 'bg-rose-500' : 'bg-amber-500'}`} />
         </div>
 
         {/* Big Typography Background */}
@@ -297,7 +321,10 @@ const PhraseCard = ({ lesson, index, onClick }: { lesson: Lesson, index: number,
         <div>
             <div className="flex items-center gap-2 mb-1">
                 <span className="text-[10px] font-bold text-zinc-400 uppercase">{(index + 1).toString().padStart(2, '0')}</span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${lesson.difficulty === 'Easy' ? 'border-emerald-500/30 text-emerald-500' : 'border-amber-500/30 text-amber-500'}`}>{lesson.difficulty}</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${lesson.difficulty === 'Easy' ? 'border-emerald-500/30 text-emerald-500' :
+                    lesson.difficulty === 'Hard' ? 'border-rose-500/30 text-rose-500' :
+                        'border-amber-500/30 text-amber-500'
+                    }`}>{lesson.difficulty}</span>
             </div>
             <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-1">{lesson.letter}</h3>
             <p className="text-xs text-zinc-500 line-clamp-1">{lesson.description}</p>
