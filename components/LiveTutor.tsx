@@ -25,6 +25,26 @@ function decode(base64: string) {
   return bytes;
 }
 
+// Universal Safe Key Access
+const getApiKey = () => {
+    try {
+      // @ts-ignore
+      if (import.meta?.env?.VITE_GEMINI_API_KEY) return import.meta.env.VITE_GEMINI_API_KEY;
+      // @ts-ignore
+      if (import.meta?.env?.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
+    } catch (e) { }
+  
+    try {
+      if (typeof process !== 'undefined' && process.env) {
+        if (process.env.VITE_GEMINI_API_KEY) return process.env.VITE_GEMINI_API_KEY;
+        if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) return process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+        if (process.env.API_KEY) return process.env.API_KEY;
+      }
+    } catch (e) { }
+  
+    return '';
+};
+
 function createBlob(data: Float32Array): { data: string; mimeType: string } {
   const l = data.length;
   const int16 = new Int16Array(l);
@@ -110,7 +130,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
 
     try {
       // Create fresh instance right before call
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: getApiKey() });
       
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });

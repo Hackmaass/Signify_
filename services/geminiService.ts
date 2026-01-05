@@ -7,6 +7,26 @@ const QUOTA_KEY = 'signify_quota_usage';
 const QUOTA_DATE_KEY = 'signify_quota_date';
 const getTodayString = () => new Date().toISOString().split('T')[0];
 
+// Universal Safe Key Access
+const getApiKey = () => {
+  try {
+    // @ts-ignore
+    if (import.meta?.env?.VITE_GEMINI_API_KEY) return import.meta.env.VITE_GEMINI_API_KEY;
+    // @ts-ignore
+    if (import.meta?.env?.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
+  } catch (e) { }
+
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      if (process.env.VITE_GEMINI_API_KEY) return process.env.VITE_GEMINI_API_KEY;
+      if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) return process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+      if (process.env.API_KEY) return process.env.API_KEY;
+    }
+  } catch (e) { }
+
+  return '';
+};
+
 export const getQuotaUsage = () => {
   const today = getTodayString();
   const storedDate = localStorage.getItem(QUOTA_DATE_KEY);
@@ -32,7 +52,7 @@ export const evaluateHandSign = async (
 ): Promise<FeedbackResponse> => {
   incrementQuota();
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpeg);base64,/, "");
 
     const prompt = `
@@ -79,7 +99,7 @@ export const evaluateHandSign = async (
 export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> => {
   incrementQuota();
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: getApiKey() });
     const prompt = `
       Convert the sentence "${sentence}" into a sequence of ASL signs.
       Return a JSON array of objects:
@@ -129,7 +149,7 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
 export const generateSpeech = async (text: string): Promise<string | null> => {
     incrementQuota();
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: getApiKey() });
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash-preview-tts",
           contents: [{ parts: [{ text }] }],
