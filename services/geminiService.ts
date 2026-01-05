@@ -7,26 +7,6 @@ const QUOTA_KEY = 'signify_quota_usage';
 const QUOTA_DATE_KEY = 'signify_quota_date';
 const getTodayString = () => new Date().toISOString().split('T')[0];
 
-// Universal Safe Key Access
-const getApiKey = () => {
-  try {
-    // @ts-ignore
-    if (import.meta?.env?.VITE_GEMINI_API_KEY) return import.meta.env.VITE_GEMINI_API_KEY;
-    // @ts-ignore
-    if (import.meta?.env?.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
-  } catch (e) { }
-
-  try {
-    // Direct check for Vite replacement (Vite replaces the whole string 'process.env.API_KEY')
-    // @ts-ignore
-    if (process.env.API_KEY) return process.env.API_KEY;
-    // @ts-ignore
-    if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
-  } catch (e) { }
-
-  return '';
-};
-
 export const getQuotaUsage = () => {
   const today = getTodayString();
   const storedDate = localStorage.getItem(QUOTA_DATE_KEY);
@@ -52,7 +32,7 @@ export const evaluateHandSign = async (
 ): Promise<FeedbackResponse> => {
   incrementQuota();
   try {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpeg);base64,/, "");
 
     const prompt = `
@@ -99,7 +79,7 @@ export const evaluateHandSign = async (
 export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> => {
   incrementQuota();
   try {
-    const ai = new GoogleGenAI({ apiKey: getApiKey() });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `
       Convert the sentence "${sentence}" into a sequence of ASL signs.
       Return a JSON array of objects:
@@ -146,12 +126,10 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
   }
 };
 
-export const generateSpeech = async (text: string, apiKeyOverride?: string): Promise<string | null> => {
+export const generateSpeech = async (text: string): Promise<string | null> => {
     incrementQuota();
     try {
-        const key = apiKeyOverride || getApiKey();
-        if (!key) throw new Error("API Key not found");
-        const ai = new GoogleGenAI({ apiKey: key });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash-preview-tts",
           contents: [{ parts: [{ text }] }],

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 import { Mic, MicOff, Sparkles, Loader2, StopCircle } from 'lucide-react';
 import { HandTrackingRef } from './HandTrackingCanvas';
 import { FeedbackResponse } from '../types';
-import { generateSpeech } from '../services/geminiService';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Manual Encoding Helpers ---
@@ -25,26 +25,6 @@ function decode(base64: string) {
   }
   return bytes;
 }
-
-// Universal Safe Key Access
-const getApiKey = () => {
-    try {
-      // @ts-ignore
-      if (import.meta?.env?.VITE_GEMINI_API_KEY) return import.meta.env.VITE_GEMINI_API_KEY;
-      // @ts-ignore
-      if (import.meta?.env?.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
-    } catch (e) { }
-  
-    try {
-      // Direct check for Vite replacement
-      // @ts-ignore
-      if (process.env.API_KEY) return process.env.API_KEY;
-      // @ts-ignore
-      if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
-    } catch (e) { }
-  
-    return '';
-};
 
 function createBlob(data: Float32Array): { data: string; mimeType: string } {
   const l = data.length;
@@ -131,64 +111,44 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
 
     try {
       // Create fresh instance right before call
-      const ai = new GoogleGenAI({ apiKey: getApiKey() });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       inputContextRef.current = inputCtx;
       outputContextRef.current = outputCtx;
 
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 16000
-        }
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: `You are "Signify", a strict but encouraging ASL Coach.
+          systemInstruction: `You are "Signify", a friendly and encouraging ASL tutor. 
           The user is currently learning the sign for: "${lessonSign}".
           Description: "${lessonDescription}".
           
-          CORE PROTOCOL:
-          1. MONITOR VISUALS: Constantly check the video frames. If the hand is not visible or unclear, IMMEDIATELY ask the user to adjust their position. Do not guess.
-          2. CONCISE FEEDBACK: Keep your responses short (1-2 sentences maximum).
-          3. CORRECTIVE FOCUS: If the sign is wrong, explain strictly what to fix (e.g., "Flatten your palm", "Thumb must touch index").
-          4. VALIDATION: If the sign is correct, confirm it clearly and enthusiastically.
-          5. NO HALLUCINATIONS: Do not claim to see things that aren't there. If the screen is black or empty, say "I cannot see your hand."`,
+          ALWAYS GUIDING RULES:
+          1. When the session starts, briefly introduce the sign and how to do it.
+          2. Use the provided video frames to see the user's hands.
+          3. Be concise. Don't talk over the user for too long.
+          4. Provide real-time corrective feedback based on what you see in the video frames.
+          5. If the user succeeds, give them a warm compliment!`,
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
           },
         },
         callbacks: {
-          onopen: async () => {
+          onopen: () => {
             console.log('Live Session Opened');
             setIsConnected(true);
             setError(null);
             
-            // Proactive Intro: Use standard TTS for reliable initial greeting
-            try {
-                const text = `Hi! I'm your tutor. Let's practice the sign for "${lessonSign}". ${lessonDescription}. Show me your hand when you're ready!`;
-                // Pass the locally working key to ensure TTS generation works
-                const audioBase64 = await generateSpeech(text, getApiKey());
-                if (audioBase64 && outputContextRef.current) {
-                    setIsSpeaking(true);
-                    const ctx = outputContextRef.current;
-                    const buffer = await decodeAudioData(decode(audioBase64), ctx);
-                    const source = ctx.createBufferSource();
-                    source.buffer = buffer;
-                    source.connect(ctx.destination);
-                    source.start(0);
-                    source.onended = () => setIsSpeaking(false);
-                }
-            } catch (err) {
-                console.error("Intro Speech Failed", err);
-            }
+            // Proactive Intro: Send initial guidance once connected
+            sessionPromise.then(session => {
+              // Fix: session.send replaced with session.sendRealtimeInput
+              session.sendRealtimeInput({ text: `Hi! I'm your tutor. Let's practice the sign for "${lessonSign}". ${lessonDescription}. Show me your hand when you're ready!` });
+            });
           },
           onmessage: async (msg: LiveServerMessage) => {
             const audioBase64 = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
@@ -259,7 +219,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             }
           }).catch(() => {});
         }
-      }, 330);
+      }, 1000);
 
     } catch (e: any) {
       console.error("Live Tutor Initialization Failed", e);
@@ -293,9 +253,10 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             ? `The automated system just verified their sign was correct with a score of ${feedback.score}%. Give them a big enthusiastic congratulations!` 
             : `The automated system noticed an issue: ${feedback.feedback}. Politely guide them on how to fix it based on the description: ${lessonDescription}.`;
         
-        // sessionPromiseRef.current.then(session => {
-        //     session.sendRealtimeInput({ media: { mimeType: "text/plain", data: btoa(text) } });
-        // }).catch(() => {});
+        sessionPromiseRef.current.then(session => {
+            // Fix: session.send replaced with session.sendRealtimeInput
+            session.sendRealtimeInput({ text });
+        }).catch(() => {});
     }
   }, [feedback, isConnected, isActive, lessonDescription]);
 
