@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserData, Lesson, LessonCategory } from './types';
-import { signOut, onAuthStateChange } from './services/firebaseService';
+import { signOut, onAuthStateChange, trackUserAction } from './services/firebaseService';
 import { generateLessonPlan } from './services/geminiService';
 import StreakCalendar from './components/StreakCalendar';
 import QuotaTracker from './components/QuotaTracker';
@@ -8,6 +8,10 @@ import LessonView from './components/LessonView';
 import LoginPage from './components/LoginPage';
 import WelcomeSequence from './components/WelcomeSequence';
 import InteractiveTutorial from './components/InteractiveTutorial';
+import DashboardSuggestions from './components/DashboardSuggestions';
+import MotivationalMessage from './components/MotivationalMessage';
+import DynamicBackgroundText from './components/DynamicBackgroundText';
+import ProfileMenu from './components/ProfileMenu';
 import Dock from './components/Dock';
 import { Play, LogOut, Home, Activity, Moon, Sun, BookOpen, LogIn, Loader2, Sparkles, Wand2, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
@@ -51,6 +55,9 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedLessons, setGeneratedLessons] = useState<Lesson[]>([]);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [lastAction, setLastAction] = useState<string>('');
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [profileMenuPosition, setProfileMenuPosition] = useState({ x: 0, y: 0 });
   
   const statsRef = useRef<HTMLDivElement>(null);
   const hasShownWelcomeRef = useRef(false);
@@ -93,8 +100,23 @@ export default function App() {
     e.preventDefault();
     if (!customInput.trim()) return;
     setIsGenerating(true);
+    
+    // Track lesson generation
+    if (user) {
+      trackUserAction(user.uid, 'lesson_generated', { input: customInput });
+    }
+    
     const lessons = await generateLessonPlan(customInput);
     setGeneratedLessons(lessons);
+    
+    // Track successful generation
+    if (user && lessons.length > 0) {
+      trackUserAction(user.uid, 'lesson_generation_success', { 
+        input: customInput,
+        lessonCount: lessons.length 
+      });
+    }
+    
     setIsGenerating(false);
   };
 
@@ -103,7 +125,40 @@ export default function App() {
     setCurrentQueueIndex(0);
   };
 
+  // Get recommended lessons based on user progress
+  const getRecommendedLessons = (): Lesson[] => {
+    if (!user) return [];
+    
+    // For new users, recommend easy alphabet letters
+    if (user.totalLessons === 0) {
+      return ALPHABET_LESSONS.filter(l => l.difficulty === 'Easy').slice(0, 3);
+    }
+    
+    // For users with some progress, recommend next in sequence or easy phrases
+    if (user.totalLessons < 5) {
+      return ALPHABET_LESSONS.slice(user.totalLessons, user.totalLessons + 2);
+    }
+    
+    // For more advanced users, mix alphabet and phrases
+    const nextAlphabet = ALPHABET_LESSONS.slice(user.totalLessons % 26, (user.totalLessons % 26) + 1);
+    const easyPhrases = PHRASE_LESSONS.filter(l => l.difficulty === 'Easy').slice(0, 1);
+    return [...nextAlphabet, ...easyPhrases].slice(0, 2);
+  };
+
   const handleLessonComplete = (updatedUser: UserData) => {
+    // Check for streak milestones
+    const previousStreak = user?.streak || 0;
+    const newStreak = updatedUser.streak;
+    
+    // Trigger milestone message for significant streaks
+    if (newStreak > previousStreak && (newStreak === 7 || newStreak === 30 || newStreak === 100)) {
+      setLastAction('streak_milestone');
+      setTimeout(() => setLastAction(''), 6000);
+    } else {
+      setLastAction('lesson_completed');
+      setTimeout(() => setLastAction(''), 5000);
+    }
+    
     setUser(updatedUser);
     if (currentQueueIndex < lessonQueue.length - 1) {
         setCurrentQueueIndex(prev => prev + 1);
@@ -113,11 +168,70 @@ export default function App() {
     }
   };
 
+  const handleStartLesson = (lessons: Lesson[]) => {
+    setLastAction('lesson_started');
+    setTimeout(() => setLastAction(''), 3000);
+    
+    // Track lesson start
+    if (user) {
+      trackUserAction(user.uid, 'lesson_started', {
+        lessonId: lessons[0]?.id,
+        lessonCategory: lessons[0]?.category,
+        letter: lessons[0]?.letter
+      });
+    }
+    
+    startLesson(lessons);
+  };
+
+  const handleTabChange = (tab: LessonCategory) => {
+    setLastAction('tab_changed');
+    setTimeout(() => setLastAction(''), 3000);
+    
+    // Track tab change
+    if (user) {
+      trackUserAction(user.uid, 'tab_changed', { tab });
+    }
+    
+    setActiveTab(tab);
+  };
+
   const dockItems = [
-    { label: 'Home', icon: <Home />, onClick: () => { setLessonQueue([]); setCurrentQueueIndex(-1); } },
-    { label: 'Lessons', icon: <BookOpen />, onClick: () => setActiveTab('alphabet') },
-    { label: 'Progress', icon: <Activity />, onClick: () => statsRef.current?.scrollIntoView({ behavior: 'smooth' }) },
-    { label: theme === 'dark' ? 'Light' : 'Dark', icon: theme === 'dark' ? <Sun /> : <Moon />, onClick: () => setTheme(prev => prev === 'dark' ? 'light' : 'dark') },
+    { 
+      label: 'Home', 
+      icon: <Home />, 
+      onClick: () => { 
+        setLessonQueue([]); 
+        setCurrentQueueIndex(-1);
+        setActiveTab('alphabet');
+        statsRef.current?.scrollIntoView({ behavior: 'smooth' });
+      } 
+    },
+    { 
+      label: 'Lessons', 
+      icon: <BookOpen />, 
+      onClick: () => {
+        handleTabChange('alphabet');
+        setTimeout(() => {
+          const lessonsSection = document.querySelector('[data-tutorial="lessons"]');
+          lessonsSection?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      } 
+    },
+    { 
+      label: 'Progress', 
+      icon: <Activity />, 
+      onClick: () => {
+        statsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } 
+    },
+    { 
+      label: theme === 'dark' ? 'Light' : 'Dark', 
+      icon: theme === 'dark' ? <Sun /> : <Moon />, 
+      onClick: () => {
+        setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+      } 
+    },
   ];
 
   if (user) {
@@ -134,15 +248,29 @@ export default function App() {
                 )}
             </div>
         ),
-        onClick: () => {} 
+        onClick: () => {
+          // Position menu below dock (top-right area)
+          setProfileMenuPosition({ x: window.innerWidth - 20, y: 80 });
+          setShowProfileMenu(true);
+        } 
     });
-    dockItems.push({ label: 'Logout', icon: <LogOut className="text-red-400" />, onClick: () => { signOut(); setUser(null); } });
   }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-black"><Loader2 className="animate-spin text-white w-8 h-8" /></div>;
 
   return (
-    <div className="min-h-screen bg-transparent text-text-primary overflow-x-hidden font-sans">
+    <div className="min-h-screen bg-transparent text-text-primary overflow-x-hidden font-sans relative">
+        {/* Dynamic Background Text */}
+        {user && (
+          <DynamicBackgroundText
+            user={user}
+            activeTab={activeTab}
+            totalLessons={user.totalLessons}
+            streak={user.streak}
+            isLessonActive={currentQueueIndex !== -1}
+            lastAction={lastAction}
+          />
+        )}
         <LayoutGroup>
             <AnimatePresence mode="wait">
                 {!user ? (
@@ -155,6 +283,21 @@ export default function App() {
                             <InteractiveTutorial
                                 onComplete={handleTutorialComplete}
                                 onSkip={handleTutorialSkip}
+                            />
+                        )}
+                        {showProfileMenu && user && (
+                            <ProfileMenu
+                                user={user}
+                                onClose={() => setShowProfileMenu(false)}
+                                onLogout={() => {
+                                    signOut();
+                                    setUser(null);
+                                    setShowProfileMenu(false);
+                                }}
+                                onViewProfile={() => {
+                                    statsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }}
+                                position={profileMenuPosition}
                             />
                         )}
                         <AnimatePresence mode="wait">
@@ -176,11 +319,12 @@ export default function App() {
                                     </div>
                                     <header 
                                         data-tutorial="dashboard"
-                                        className="flex flex-col lg:flex-row justify-between items-end gap-12 mt-20 mb-20"
+                                        className="flex flex-col lg:flex-row justify-between items-end gap-12 mt-20 mb-12"
                                     >
                                         <div className="flex-1">
                                             <h2 className="text-zinc-500 font-medium mb-2 text-lg">Welcome, {user.displayName}</h2>
-                                            <h1 className="text-6xl lg:text-7xl font-bold tracking-tighter text-zinc-900 dark:text-white">Dashboard</h1>
+                                            <h1 className="text-6xl lg:text-7xl font-bold tracking-tighter text-zinc-900 dark:text-white mb-4">Dashboard</h1>
+                                            <MotivationalMessage user={user} />
                                         </div>
                                         <div 
                                             data-tutorial="streak"
@@ -192,6 +336,13 @@ export default function App() {
                                         </div>
                                     </header>
 
+                                    {/* Dashboard Suggestions & Quick Actions */}
+                                    <DashboardSuggestions 
+                                        user={user}
+                                        onStartLesson={(lesson) => handleStartLesson([lesson])}
+                                        recommendedLessons={getRecommendedLessons()}
+                                    />
+
                                     <nav 
                                         data-tutorial="lessons"
                                         className="flex justify-center mb-12"
@@ -200,7 +351,7 @@ export default function App() {
                                             {['alphabet', 'phrase', 'custom'].map((tab) => (
                                                 <button
                                                     key={tab}
-                                                    onClick={() => setActiveTab(tab as LessonCategory)}
+                                                    onClick={() => handleTabChange(tab as LessonCategory)}
                                                     className={`relative px-10 py-3 rounded-xl text-sm font-bold transition-all z-10 ${
                                                         activeTab === tab ? 'text-white dark:text-black' : 'text-zinc-500'
                                                     }`}
@@ -223,7 +374,7 @@ export default function App() {
                                             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-6"
                                         >
                                             {activeTab === 'alphabet' && ALPHABET_LESSONS.map((lesson, i) => (
-                                                <Card key={lesson.id} lesson={lesson} index={i} onClick={() => startLesson([lesson])} />
+                                                <Card key={lesson.id} lesson={lesson} index={i} onClick={() => handleStartLesson([lesson])} />
                                             ))}
                                         </motion.div>
                                     </AnimatePresence>
@@ -231,7 +382,7 @@ export default function App() {
                                     {activeTab === 'phrase' && (
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                             {PHRASE_LESSONS.map((lesson, i) => (
-                                                <PhraseCard key={lesson.id} lesson={lesson} index={i} onClick={() => startLesson([lesson])} />
+                                                <PhraseCard key={lesson.id} lesson={lesson} index={i} onClick={() => handleStartLesson([lesson])} />
                                             ))}
                                         </div>
                                     )}
@@ -255,7 +406,7 @@ export default function App() {
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 {generatedLessons.map((lesson, i) => (
-                                                    <PhraseCard key={lesson.id} lesson={lesson} index={i} onClick={() => startLesson(generatedLessons)} />
+                                                    <PhraseCard key={lesson.id} lesson={lesson} index={i} onClick={() => handleStartLesson(generatedLessons)} />
                                                 ))}
                                             </div>
                                         </div>

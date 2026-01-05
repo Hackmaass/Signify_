@@ -12,8 +12,7 @@ const WelcomeSequence: React.FC<WelcomeSequenceProps> = ({ onComplete }) => {
 
   const steps = useMemo(() => [
     { text: "Hello There!", duration: 2500 },
-    { text: "Learn Sign language the easy way", duration: 3000 },
-    { text: "Isn't this so cool?!", duration: 2500 }
+    { text: "Learn Sign language the easy way", duration: 3000 }
   ], []);
 
   useEffect(() => {

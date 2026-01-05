@@ -3,7 +3,7 @@ import { ArrowLeft, ScanFace, CheckCircle, AlertCircle, SkipForward, Move } from
 import HandTrackingCanvas, { HandTrackingRef } from './HandTrackingCanvas';
 import LiveTutor from './LiveTutor';
 import { evaluateHandSign } from '../services/geminiService';
-import { updateStreak } from '../services/firebaseService';
+import { updateStreak, trackLessonCompletion, trackUserAction } from '../services/firebaseService';
 import { Lesson, UserData, FeedbackResponse } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -80,9 +80,27 @@ const LessonView: React.FC<Props> = ({ lesson, user, onBack, onComplete, hasNext
 
       if (result.isCorrect) {
         const updatedUser = await updateStreak(user);
+        
+        // Track lesson completion in Firestore
+        await trackLessonCompletion(user.uid, lesson.id, lesson.category, result.score);
+        await trackUserAction(user.uid, 'lesson_completed', {
+          lessonId: lesson.id,
+          lessonCategory: lesson.category,
+          score: result.score,
+          letter: lesson.letter
+        });
+        
         setVerifyDuration(5000);
         // EXTENDED DELAY: Wait 5.5s before moving on so the AI can finish complimenting
         setTimeout(() => onComplete(updatedUser), 5500);
+      } else {
+        // Track failed attempt
+        await trackUserAction(user.uid, 'lesson_attempt_failed', {
+          lessonId: lesson.id,
+          lessonCategory: lesson.category,
+          score: result.score,
+          letter: lesson.letter
+        });
       }
     }
     setIsProcessing(false);

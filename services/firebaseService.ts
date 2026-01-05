@@ -7,6 +7,15 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged
 } from "firebase/auth";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  onSnapshot,
+  serverTimestamp
+} from "firebase/firestore";
 import { UserData } from '../types';
 
 // Universal Safe Env Access (Works for Vite, Next.js, CRA, and Node)
@@ -44,6 +53,7 @@ const firebaseConfig = {
 // Initialize Firebase conditionally
 let app;
 let auth: any;
+let db: any;
 let isFirebaseInitialized = false;
 
 try {
@@ -55,6 +65,7 @@ try {
       app = getApp();
     }
     auth = getAuth(app);
+    db = getFirestore(app);
     isFirebaseInitialized = true;
   } else {
     console.warn("Firebase config missing. Running in mock mode.");
@@ -80,8 +91,60 @@ const createDefaultUserData = (uid: string, displayName: string, photoURL?: stri
   history: {}
 });
 
-// --- HELPER: LOCAL STORAGE DB ---
+// --- FIRESTORE HELPERS ---
+const getUserDocRef = (uid: string) => {
+  if (!isFirebaseInitialized || !db) return null;
+  return doc(db, 'users', uid);
+};
+
+// Fetch or create user data from Firestore (with localStorage fallback)
 const fetchOrCreateUserData = async (uid: string, displayName: string, photoURL?: string): Promise<UserData> => {
+  // Try Firestore first
+  if (isFirebaseInitialized && db) {
+    try {
+      const userDocRef = getUserDocRef(uid);
+      if (userDocRef) {
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          const userData: UserData = {
+            uid,
+            displayName: displayName || data.displayName || 'Learner',
+            photoURL: photoURL || data.photoURL,
+            streak: data.streak || 0,
+            lastPracticeDate: data.lastPracticeDate || new Date(0).toISOString(),
+            totalLessons: data.totalLessons || 0,
+            history: data.history || {}
+          };
+          
+          // Sync to localStorage as backup
+          const key = getStorageKey(uid);
+          localStorage.setItem(key, JSON.stringify(userData));
+          
+          return userData;
+        } else {
+          // Create new user in Firestore
+          const newUser = createDefaultUserData(uid, displayName, photoURL);
+          await setDoc(userDocRef, {
+            ...newUser,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+          
+          // Also save to localStorage as backup
+          const key = getStorageKey(uid);
+          localStorage.setItem(key, JSON.stringify(newUser));
+          
+          return newUser;
+        }
+      }
+    } catch (error) {
+      console.warn("Firestore fetch failed, falling back to localStorage:", error);
+    }
+  }
+
+  // Fallback to localStorage
   const key = getStorageKey(uid);
   const stored = localStorage.getItem(key);
 
@@ -89,7 +152,7 @@ const fetchOrCreateUserData = async (uid: string, displayName: string, photoURL?
     const parsed = JSON.parse(stored);
     return {
       ...parsed,
-      displayName: displayName || parsed.displayName, // Update display name if it changed
+      displayName: displayName || parsed.displayName,
       photoURL: photoURL || parsed.photoURL,
     };
   }
@@ -97,6 +160,28 @@ const fetchOrCreateUserData = async (uid: string, displayName: string, photoURL?
   const newUser = createDefaultUserData(uid, displayName, photoURL);
   localStorage.setItem(key, JSON.stringify(newUser));
   return newUser;
+};
+
+// Save user data to Firestore (with localStorage backup)
+const saveUserDataToFirestore = async (userData: UserData): Promise<void> => {
+  if (isFirebaseInitialized && db) {
+    try {
+      const userDocRef = getUserDocRef(userData.uid);
+      if (userDocRef) {
+        await updateDoc(userDocRef, {
+          ...userData,
+          updatedAt: serverTimestamp()
+        });
+      }
+    } catch (error) {
+      console.error("Failed to save to Firestore:", error);
+      // Continue to save to localStorage as backup
+    }
+  }
+  
+  // Always save to localStorage as backup
+  const key = getStorageKey(userData.uid);
+  localStorage.setItem(key, JSON.stringify(userData));
 };
 
 // --- AUTH SERVICES ---
@@ -230,10 +315,26 @@ export const onAuthStateChange = (callback: (user: UserData | null) => void) => 
   // 2. Check Firebase Session
   if (isFirebaseInitialized && auth) {
     try {
-      return onAuthStateChanged(auth, async (firebaseUser: any) => {
+      let unsubscribeUserData: (() => void) | null = null;
+      
+      const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: any) => {
+        // Unsubscribe from previous user's data
+        if (unsubscribeUserData) {
+          unsubscribeUserData();
+          unsubscribeUserData = null;
+        }
+        
         if (firebaseUser) {
-          const userData = await fetchOrCreateUserData(firebaseUser.uid, firebaseUser.displayName || 'Learner', firebaseUser.photoURL || undefined);
+          // Initial fetch
+          const userData = await fetchOrCreateUserData(
+            firebaseUser.uid, 
+            firebaseUser.displayName || 'Learner', 
+            firebaseUser.photoURL || undefined
+          );
           callback(userData);
+          
+          // Subscribe to real-time updates
+          unsubscribeUserData = subscribeToUserData(firebaseUser.uid, callback);
         } else {
           callback(null);
         }
@@ -241,6 +342,14 @@ export const onAuthStateChange = (callback: (user: UserData | null) => void) => 
         console.warn("Auth state error:", error);
         callback(null);
       });
+      
+      // Return cleanup function
+      return () => {
+        unsubscribeAuth();
+        if (unsubscribeUserData) {
+          unsubscribeUserData();
+        }
+      };
     } catch (e) {
       callback(null);
       return () => { };
@@ -266,10 +375,9 @@ export const getUserData = async (): Promise<UserData | null> => {
 
 export const updateStreak = async (user: UserData): Promise<UserData> => {
   const today = new Date().toISOString().split('T')[0];
-
-
   const lastDate = user.lastPracticeDate.split('T')[0];
   const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  
   let newStreak = user.streak;
   if (!user.history[today]) {
     if (lastDate === yesterday) {
@@ -288,8 +396,118 @@ export const updateStreak = async (user: UserData): Promise<UserData> => {
     history: { ...user.history, [today]: true }
   };
 
-  const key = getStorageKey(user.uid);
-  localStorage.setItem(key, JSON.stringify(updatedUser));
+  // Save to Firestore (with localStorage backup)
+  await saveUserDataToFirestore(updatedUser);
 
   return updatedUser;
+};
+
+// Real-time listener for user data updates
+export const subscribeToUserData = (uid: string, callback: (userData: UserData | null) => void): (() => void) => {
+  if (isFirebaseInitialized && db) {
+    try {
+      const userDocRef = getUserDocRef(uid);
+      if (userDocRef) {
+        return onSnapshot(userDocRef, (doc) => {
+          if (doc.exists()) {
+            const data = doc.data();
+            const userData: UserData = {
+              uid,
+              displayName: data.displayName || 'Learner',
+              photoURL: data.photoURL,
+              streak: data.streak || 0,
+              lastPracticeDate: data.lastPracticeDate || new Date(0).toISOString(),
+              totalLessons: data.totalLessons || 0,
+              history: data.history || {}
+            };
+            
+            // Sync to localStorage
+            const key = getStorageKey(uid);
+            localStorage.setItem(key, JSON.stringify(userData));
+            
+            callback(userData);
+          } else {
+            callback(null);
+          }
+        }, (error) => {
+          console.error("Firestore subscription error:", error);
+          // Fallback to localStorage
+          const key = getStorageKey(uid);
+          const stored = localStorage.getItem(key);
+          if (stored) {
+            callback(JSON.parse(stored));
+          } else {
+            callback(null);
+          }
+        });
+      }
+    } catch (error) {
+      console.error("Failed to set up Firestore subscription:", error);
+    }
+  }
+  
+  // Fallback: return no-op unsubscribe
+  return () => {};
+};
+
+// Track lesson completion for analytics
+export const trackLessonCompletion = async (uid: string, lessonId: string, lessonCategory: string, score: number): Promise<void> => {
+  if (isFirebaseInitialized && db) {
+    try {
+      const completionRef = doc(db, 'users', uid, 'completions', `${Date.now()}_${lessonId}`);
+      await setDoc(completionRef, {
+        lessonId,
+        lessonCategory,
+        score,
+        completedAt: serverTimestamp(),
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Failed to track lesson completion:", error);
+    }
+  }
+};
+
+// Track user actions/events
+export const trackUserAction = async (uid: string, action: string, metadata?: Record<string, any>): Promise<void> => {
+  if (isFirebaseInitialized && db) {
+    try {
+      const actionRef = doc(db, 'users', uid, 'actions', `${Date.now()}_${action}`);
+      await setDoc(actionRef, {
+        action,
+        metadata: metadata || {},
+        timestamp: serverTimestamp(),
+        createdAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Failed to track user action:", error);
+    }
+  }
+};
+
+// Update user profile data
+export const updateUserProfile = async (userData: UserData): Promise<void> => {
+  await saveUserDataToFirestore(userData);
+};
+
+// Get user statistics
+export const getUserStatistics = async (uid: string): Promise<{
+  totalCompletions: number;
+  averageScore: number;
+  favoriteCategory: string;
+  lastActivity: string;
+} | null> => {
+  if (isFirebaseInitialized && db) {
+    try {
+      const completionsRef = doc(db, 'users', uid, 'stats', 'summary');
+      const completionsDoc = await getDoc(completionsRef);
+      
+      if (completionsDoc.exists()) {
+        return completionsDoc.data() as any;
+      }
+    } catch (error) {
+      console.error("Failed to get user statistics:", error);
+    }
+  }
+  return null;
 };
