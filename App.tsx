@@ -313,14 +313,14 @@ export default function App() {
                                     />
                                 </motion.div>
                             ) : (
-                                <div key="dashboard" className="min-h-screen p-8 lg:p-12 relative max-w-[1600px] mx-auto">
+                                <div key="dashboard" className="min-h-screen p-4 lg:p-8 relative max-w-[1600px] mx-auto">
                                     <Dock items={dockItems} />
                                     <div className="absolute top-8 left-8 z-50">
-                                         <h1 className="text-3xl font-bold tracking-tighter text-zinc-900 dark:text-white">Signify</h1>
+                                         <h1 className="text-4xl font-bold tracking-tighter text-zinc-900 dark:text-white">Signify</h1>
                                     </div>
                                     <header 
                                         data-tutorial="dashboard"
-                                        className="flex flex-col lg:flex-row justify-between items-end gap-12 mt-20 mb-12"
+                                        className="flex flex-col md:flex-row justify-between items-center gap-12 mt-16 mb-6"
                                     >
                                         <div className="flex-1">
                                             <h2 className="text-zinc-500 font-medium mb-2 text-lg">Welcome, {user.displayName}</h2>
@@ -346,7 +346,7 @@ export default function App() {
 
                                     <nav 
                                         data-tutorial="lessons"
-                                        className="flex justify-center mb-12"
+                                        className="flex justify-center mb-4"
                                     >
                                         <div className="p-1 bg-white dark:bg-[#121214] border border-zinc-200 dark:border-white/5 rounded-2xl inline-flex relative">
                                             {['alphabet', 'phrase', 'custom'].map((tab) => (
@@ -440,8 +440,8 @@ const Card: React.FC<CardProps> = ({ lesson, index, onClick }) => (
         <div className="absolute top-4 left-4 z-20">
             <span className="text-[10px] font-bold text-zinc-400">{(index + 1).toString().padStart(2, '0')}</span>
         </div>
-        <div className="absolute inset-0 flex items-center justify-center z-0 opacity-5">
-             <span className="text-[120px] font-black leading-none">{lesson.letter}</span>
+        <div className="absolute inset-0 flex items-center justify-center z-0 opacity-20">
+             <span className="text-[120px] font-black leading-none text-zinc-900 dark:text-white">{lesson.letter}</span>
         </div>
         <div className="absolute inset-0 flex items-center justify-center p-8 z-10 transition-transform group-hover:-translate-y-2">
              <img src={lesson.imageUrl} className="w-full h-full object-contain dark-invert" alt={lesson.letter} />

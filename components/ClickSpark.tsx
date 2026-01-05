@@ -154,7 +154,7 @@ const ClickSpark: React.FC<ClickSparkProps> = ({
     <div
       style={{
         position: 'relative',
-        display: 'inline-block',
+        display: 'block',
         width: '100%',
         overflow: 'visible'
       }}
