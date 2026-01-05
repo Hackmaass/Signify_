@@ -154,7 +154,10 @@ const LessonView: React.FC<Props> = ({ lesson, user, onBack, onComplete, hasNext
         </section>
 
         {/* Right: Camera Portal */}
-        <section className="flex-1 relative rounded-[32px] overflow-hidden shadow-2xl border border-zinc-200 dark:border-white/10 bg-zinc-900 dark:bg-black">
+        <section 
+            data-tutorial="hand-tracking"
+            className="flex-1 relative rounded-[32px] overflow-hidden shadow-2xl border border-zinc-200 dark:border-white/10 bg-zinc-900 dark:bg-black"
+        >
              <HandTrackingCanvas 
                 ref={canvasRef} 
                 onHandsDetected={setHandDetected} 
@@ -236,7 +239,10 @@ const LessonView: React.FC<Props> = ({ lesson, user, onBack, onComplete, hasNext
              )}
 
              {/* Manual Trigger */}
-             <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20">
+             <div 
+                data-tutorial="auto-verify"
+                className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20"
+             >
                 <button
                     onClick={handleVerify}
                     disabled={!handDetected || isProcessing}
@@ -254,13 +260,15 @@ const LessonView: React.FC<Props> = ({ lesson, user, onBack, onComplete, hasNext
       </main>
 
       {/* AI Live Tutor (Floating) */}
-      <LiveTutor 
-        lessonSign={lesson.letter} 
-        lessonDescription={lesson.description}
-        canvasRef={canvasRef}
-        feedback={feedback}
-        triggerIntro={true}
-      />
+      <div data-tutorial="ai-tutor">
+        <LiveTutor 
+          lessonSign={lesson.letter} 
+          lessonDescription={lesson.description}
+          canvasRef={canvasRef}
+          feedback={feedback}
+          triggerIntro={true}
+        />
+      </div>
 
     </div>
   );

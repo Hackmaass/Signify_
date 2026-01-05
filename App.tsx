@@ -6,6 +6,8 @@ import StreakCalendar from './components/StreakCalendar';
 import QuotaTracker from './components/QuotaTracker';
 import LessonView from './components/LessonView';
 import LoginPage from './components/LoginPage';
+import WelcomeSequence from './components/WelcomeSequence';
+import InteractiveTutorial from './components/InteractiveTutorial';
 import Dock from './components/Dock';
 import { Play, LogOut, Home, Activity, Moon, Sun, BookOpen, LogIn, Loader2, Sparkles, Wand2, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
@@ -42,6 +44,8 @@ export default function App() {
   const [lessonQueue, setLessonQueue] = useState<Lesson[]>([]);
   const [currentQueueIndex, setCurrentQueueIndex] = useState<number>(-1);
   const [loading, setLoading] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [activeTab, setActiveTab] = useState<LessonCategory>('alphabet');
   const [customInput, setCustomInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -49,6 +53,7 @@ export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   
   const statsRef = useRef<HTMLDivElement>(null);
+  const hasShownWelcomeRef = useRef(false);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -57,8 +62,32 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    return onAuthStateChange((userData) => { setUser(userData); setLoading(false); });
+    return onAuthStateChange((userData) => { 
+      setUser(userData); 
+      setLoading(false); 
+    });
   }, []);
+
+  const handleLoginSuccess = (userData: UserData) => {
+    // Show welcome sequence when user explicitly logs in
+    setShowWelcome(true);
+    setUser(userData);
+  };
+
+  const handleWelcomeComplete = () => {
+    setShowWelcome(false);
+    // Show tutorial after welcome sequence
+    setShowTutorial(true);
+    hasShownWelcomeRef.current = true;
+  };
+
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+  };
+
+  const handleTutorialSkip = () => {
+    setShowTutorial(false);
+  };
 
   const handleGenerateLesson = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,9 +146,17 @@ export default function App() {
         <LayoutGroup>
             <AnimatePresence mode="wait">
                 {!user ? (
-                    <LoginPage key="login" onLoginSuccess={setUser} />
+                    <LoginPage key="login" onLoginSuccess={handleLoginSuccess} />
+                ) : showWelcome ? (
+                    <WelcomeSequence key="welcome" onComplete={handleWelcomeComplete} />
                 ) : (
                     <div className="contents">
+                        {showTutorial && (
+                            <InteractiveTutorial
+                                onComplete={handleTutorialComplete}
+                                onSkip={handleTutorialSkip}
+                            />
+                        )}
                         <AnimatePresence mode="wait">
                             {currentQueueIndex !== -1 && lessonQueue[currentQueueIndex] ? (
                                 <motion.div key="lesson-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-black">
@@ -137,18 +174,28 @@ export default function App() {
                                     <div className="absolute top-8 left-8 z-50">
                                          <h1 className="text-3xl font-bold tracking-tighter text-zinc-900 dark:text-white">Signify</h1>
                                     </div>
-                                    <header className="flex flex-col lg:flex-row justify-between items-end gap-12 mt-20 mb-20">
+                                    <header 
+                                        data-tutorial="dashboard"
+                                        className="flex flex-col lg:flex-row justify-between items-end gap-12 mt-20 mb-20"
+                                    >
                                         <div className="flex-1">
                                             <h2 className="text-zinc-500 font-medium mb-2 text-lg">Welcome, {user.displayName}</h2>
                                             <h1 className="text-6xl lg:text-7xl font-bold tracking-tighter text-zinc-900 dark:text-white">Dashboard</h1>
                                         </div>
-                                        <div className="w-full lg:w-auto flex flex-col gap-4" ref={statsRef}>
+                                        <div 
+                                            data-tutorial="streak"
+                                            className="w-full lg:w-auto flex flex-col gap-4" 
+                                            ref={statsRef}
+                                        >
                                             <StreakCalendar user={user} />
                                             <QuotaTracker />
                                         </div>
                                     </header>
 
-                                    <nav className="flex justify-center mb-12">
+                                    <nav 
+                                        data-tutorial="lessons"
+                                        className="flex justify-center mb-12"
+                                    >
                                         <div className="p-1 bg-white dark:bg-[#121214] border border-zinc-200 dark:border-white/5 rounded-2xl inline-flex relative">
                                             {['alphabet', 'phrase', 'custom'].map((tab) => (
                                                 <button
