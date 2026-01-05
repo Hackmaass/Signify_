@@ -39,7 +39,7 @@ const HandTrackingCanvas = forwardRef<HandTrackingRef, HandTrackingCanvasProps>(
           ctx.translate(tempCanvas.width, 0);
           ctx.scale(-1, 1);
           ctx.drawImage(videoRef.current, 0, 0, tempCanvas.width, tempCanvas.height);
-          return tempCanvas.toDataURL('image/jpeg', 0.85);
+          return tempCanvas.toDataURL('image/jpeg', 0.6);
         }
       }
       return null;

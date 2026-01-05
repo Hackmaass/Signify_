@@ -251,7 +251,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             }
           }).catch(() => {});
         }
-      }, 1000);
+      }, 330);
 
     } catch (e: any) {
       console.error("Live Tutor Initialization Failed", e);
