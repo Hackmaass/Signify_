@@ -3,50 +3,61 @@ PROJECT WRITEUP: Signify
 PROJECT NAME: Signify - Your Personal AI-Powered ASL Tutor
 
 OVERVIEW:
-Signify is an innovative, gamified education platform designed to make learning American Sign Language (ASL) accessible, interactive, and effective. By leveraging advanced webcam-based hand tracking and state-of-the-art AI, Signify provides a "Live Tutor" experience that watches you sign and offers instant, personalized corrections—just like a real teacher.
+Signify is an innovative, gamified education platform designed to make learning American Sign Language (ASL) accessible, interactive, and effective. By leveraging advanced webcam-based hand tracking and state-of-the-art Generative AI, Signify provides a "Live Tutor" experience that watches you sign and offers instant, personalized corrections—just like a real teacher.
+
+GOOGLE TECHNOLOGIES IMPLEMENTED:
+Signify is built on a robust foundation of Google's cutting-edge tools and services:
+
+1.  🧠 **Google Gemini AI Models**:
+    *   **Gemini 3 Flash Preview**: The core intelligence engine. It powers the "Live Tutor" vision capabilities, analyzing static and dynamic hand signs in real-time to provide semantic feedback (e.g., "Straighten your thumb"). It also generates custom lesson plans dynamically from user input.
+    *   **Gemini 2.5 Flash Preview (TTS)**: Powers the conversational interface. We utilize the Native Multimodal Live API capabilities (specifically Text-to-Speech) to give the AI a natural, encouraging voice (Voice: 'Kore') that speaks corrections and affirmations to the learner.
+
+2.  🖐️ **Google MediaPipe**:
+    *   **Hands Solution**: Running client-side directly in the browser, MediaPipe tracks 21 distinct 3D landmarks on the user's hands. This allows for privacy-preserving, ultra-low-latency tracking that only sends data to the AI when a specific sign needs detailed semantic analysis.
+
+3.  🔥 **Firebase (Google Backend as a Service)**:
+    *   **Authentication**: Secure email/password login system.
+    *   **Cloud Firestore**: A NoSQL cloud database used to store user profiles, learning history, streaks, and progress stats in real-time.
+    *   **Infrastructure**: Provides the serverless backend infrastructure that scales automatically.
+
+4.  🎨 **Google Fonts**:
+    *   **Inter**: Utilized for the primary typography to ensure a clean, modern, and accessible reading experience across all devices.
 
 KEY FEATURES:
 
-1.  📷 Real-Time Hand Tracking
-    -   Utilizes **Google MediaPipe** to defect 21 distinct landmarks on your hands directly in the browser (client-side).
-    -   Privacy-focused: Video feeds are processed locally or sent securely only when active AI feedback is requested.
+1.  📷 **Real-Time Hand Tracking**
+    -   Utilizes **Google MediaPipe** for instant client-side skeletal tracking.
+    -   Visualizes hand landmarks on screen for immediate visual feedback.
+    -   Privacy-focused: Raw video feeds are processed locally; only snapshots are analyzed by Gemini when feedback is requested.
 
-2.  🤖 AI-Powered Live Tutor
-    -   **Real-Time Feedback**: Powered by **Google Gemini 2.5 Flash Native**, the system analyzes video frames of your hands.
-    -   **Correction Engine**: Detects errors in form (e.g., "Thumb correction needed") and provides specific, actionable advice.
-    -   **Interactive Voice**: The AI speaks to you using synthesized speech (Zephyr voice), guiding you through lessons with encouragement.
+2.  🤖 **AI-Powered Live Tutor**
+    -   **Vision Analysis**: **Gemini 3 Flash** evaluates the user's hand shape, orientation, and motion against the correct ASL sign.
+    -   **Natural Voice**: **Gemini 2.5 Flash TTS** provides spoken feedback, creating a conversational coaching loop.
+    -   **Granular Feedback**: Detects subtle errors (e.g., thumb tuck, palm orientation) that traditional classifiers miss.
 
-3.  📚 Smart Curriculum & Custom Lessons
-    -   **Static Lessons**: Master the basics with A-Z alphabet tutorials.
-    -   **Dynamic Phrases**: Learn complex words like "Hello", utilizing motion tracking algorithms.
-    -   **AI Generator**: Type *any* word or phrase, and the system instantly generates a custom lesson plan using Generative AI.
+3.  📚 **Smart Curriculum & Generative Lessons**
+    -   **Static & Dynamic Signs**: Covers the ASL Alphabet (A-Z) and common dynamic phrases ("Hello", "Thank You").
+    -   **AI Generator**: Type *any* word or phrase, and **Gemini 3** instantly creates a structured lesson plan with descriptions, difficulty ratings, and instructions.
 
-4.  🔥 Gamification
-    -   Daily Streak tracking to build momentum.
-    -   Quota Tracker: Visualizes your daily API usage to keep learning sustainable.
-    -   Progress badges and unlockable achievements.
+4.  🔥 **Gamification & Progress**
+    -   **Daily Streaks**: Logic stored in **Firestore** tracks consecutive practice days.
+    -   **Quota Tracker**: Visualizes daily AI API usage limits.
+    -   **Smart History**: Remembers your past lessons and scores.
 
-5.  🎨 Modern Aesthetic
-    -   Designed with a "Glassmorphism" UI using **Tailwind CSS**.
-    -   Features smooth Framer Motion animations and a sleek dark mode.
+5.  ✨ **Modern Aesthetic**
+    -   **Glassmorphism UI**: A premium, dark-mode design using **Tailwind CSS**.
+    -   **Interactive Animations**: **Framer Motion** and **GSAP** bring the interface to life.
 
 TECHNOLOGY STACK:
--   **Frontend**: React 18, Vite, TypeScript
--   **AI & Computer Vision**:
-    -   Google Gemini 2.5 Flash Native (Multimodal Live API)
-    -   Google MediaPipe (Hand Landmarker)
--   **Backend**: Firebase (Authentication, Firestore Database)
--   **Styling**: Tailwind CSS
+-   **Frontend**: React 19, Vite, TypeScript
+-   **AI**: Google Gemini 3 Flash, Gemini 2.5 Flash TTS
+-   **Computer Vision**: Google MediaPipe Hands
+-   **Backend**: Firebase (Auth, Firestore)
+-   **Styling**: Tailwind CSS, Lucide React
+-   **Animations**: Framer Motion, GSAP
 -   **Deployment**: Vercel
 
-RECENT ENGINEERING HIGHLIGHTS:
--   **Live Session Optimization**: Implemented highly efficient video streaming (1 FPS) to Gemini Live to minimize latency and cost while maintaining accuracy.
--   **Robust API Handling**: Custom "Universal Key Access" ensuring seamless operation across local, production, and varied environment configurations.
--   **Stability Fixes**: Resolved critical runtime crashes in the Live Session module for a smooth user experience.
-
-HOW IT WORKS:
-1.  **Select a Lesson**: Choose a letter or phrase.
-2.  **Enable AI Tutor**: Grant camera access.
-3.  **Perform the Sign**: The app tracks your hand skeleton in real-time.
-4.  **Get Feedback**: The AI compares your gesture to the correct sign and speaks corrections (e.g., "Rotate your palm outward").
-5.  **Succeed**: Once correct, the system validates your move and advances your streak!
+ENGINEERING HIGHLIGHTS:
+-   **Hybrid AI/CV Architecture**: Combines the speed of MediaPipe (30+ FPS tracking) with the deep understanding of Gemini (semantic analysis) for a balanced, responsive experience.
+-   **Efficient Quota Management**: Implemented client-side limits and optimized prompts to ensure sustainable use of the specialized Gemini models.
+-   **Universal Environment Config**: A robust configuration service that seamlessly handles API keys across local development (Vite) and production environments.
