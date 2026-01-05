@@ -3,6 +3,7 @@ import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 import { Mic, MicOff, Sparkles, Loader2, StopCircle } from 'lucide-react';
 import { HandTrackingRef } from './HandTrackingCanvas';
 import { FeedbackResponse } from '../types';
+import { generateSpeech } from '../services/geminiService';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // --- Manual Encoding Helpers ---
@@ -158,16 +159,28 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
           },
         },
         callbacks: {
-          onopen: () => {
+          onopen: async () => {
             console.log('Live Session Opened');
             setIsConnected(true);
             setError(null);
             
-            // Proactive Intro: Send initial guidance once connected
-            // sessionPromise.then(session => {
-            //   const text = `Hi! I'm your tutor. Let's practice the sign for "${lessonSign}". ${lessonDescription}. Show me your hand when you're ready!`;
-            //   // session.sendRealtimeInput({ media: { mimeType: "text/plain", data: btoa(text) } });
-            // });
+            // Proactive Intro: Use standard TTS for reliable initial greeting
+            try {
+                const text = `Hi! I'm your tutor. Let's practice the sign for "${lessonSign}". ${lessonDescription}. Show me your hand when you're ready!`;
+                const audioBase64 = await generateSpeech(text);
+                if (audioBase64 && outputContextRef.current) {
+                    setIsSpeaking(true);
+                    const ctx = outputContextRef.current;
+                    const buffer = await decodeAudioData(decode(audioBase64), ctx);
+                    const source = ctx.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(ctx.destination);
+                    source.start(0);
+                    source.onended = () => setIsSpeaking(false);
+                }
+            } catch (err) {
+                console.error("Intro Speech Failed", err);
+            }
           },
           onmessage: async (msg: LiveServerMessage) => {
             const audioBase64 = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
