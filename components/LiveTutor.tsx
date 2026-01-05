@@ -165,7 +165,8 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             
             // Proactive Intro: Send initial guidance once connected
             sessionPromise.then(session => {
-              (session as any).send([{ text: `Hi! I'm your tutor. Let's practice the sign for "${lessonSign}". ${lessonDescription}. Show me your hand when you're ready!` }]);
+              const text = `Hi! I'm your tutor. Let's practice the sign for "${lessonSign}". ${lessonDescription}. Show me your hand when you're ready!`;
+              session.sendRealtimeInput({ media: { mimeType: "text/plain", data: btoa(text) } });
             });
           },
           onmessage: async (msg: LiveServerMessage) => {
@@ -272,7 +273,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             : `The automated system noticed an issue: ${feedback.feedback}. Politely guide them on how to fix it based on the description: ${lessonDescription}.`;
         
         sessionPromiseRef.current.then(session => {
-            (session as any).send([{ text }]);
+            session.sendRealtimeInput({ media: { mimeType: "text/plain", data: btoa(text) } });
         }).catch(() => {});
     }
   }, [feedback, isConnected, isActive, lessonDescription]);
