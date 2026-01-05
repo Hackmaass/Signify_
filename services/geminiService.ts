@@ -17,11 +17,11 @@ const getApiKey = () => {
   } catch (e) { }
 
   try {
-    if (typeof process !== 'undefined' && process.env) {
-      if (process.env.VITE_GEMINI_API_KEY) return process.env.VITE_GEMINI_API_KEY;
-      if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) return process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-      if (process.env.API_KEY) return process.env.API_KEY;
-    }
+    // Direct check for Vite replacement (Vite replaces the whole string 'process.env.API_KEY')
+    // @ts-ignore
+    if (process.env.API_KEY) return process.env.API_KEY;
+    // @ts-ignore
+    if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
   } catch (e) { }
 
   return '';

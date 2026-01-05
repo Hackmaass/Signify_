@@ -35,11 +35,11 @@ const getApiKey = () => {
     } catch (e) { }
   
     try {
-      if (typeof process !== 'undefined' && process.env) {
-        if (process.env.VITE_GEMINI_API_KEY) return process.env.VITE_GEMINI_API_KEY;
-        if (process.env.NEXT_PUBLIC_GEMINI_API_KEY) return process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-        if (process.env.API_KEY) return process.env.API_KEY;
-      }
+      // Direct check for Vite replacement
+      // @ts-ignore
+      if (process.env.API_KEY) return process.env.API_KEY;
+      // @ts-ignore
+      if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
     } catch (e) { }
   
     return '';
@@ -164,10 +164,10 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             setError(null);
             
             // Proactive Intro: Send initial guidance once connected
-            sessionPromise.then(session => {
-              const text = `Hi! I'm your tutor. Let's practice the sign for "${lessonSign}". ${lessonDescription}. Show me your hand when you're ready!`;
-              session.sendRealtimeInput({ media: { mimeType: "text/plain", data: btoa(text) } });
-            });
+            // sessionPromise.then(session => {
+            //   const text = `Hi! I'm your tutor. Let's practice the sign for "${lessonSign}". ${lessonDescription}. Show me your hand when you're ready!`;
+            //   // session.sendRealtimeInput({ media: { mimeType: "text/plain", data: btoa(text) } });
+            // });
           },
           onmessage: async (msg: LiveServerMessage) => {
             const audioBase64 = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
@@ -272,9 +272,9 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             ? `The automated system just verified their sign was correct with a score of ${feedback.score}%. Give them a big enthusiastic congratulations!` 
             : `The automated system noticed an issue: ${feedback.feedback}. Politely guide them on how to fix it based on the description: ${lessonDescription}.`;
         
-        sessionPromiseRef.current.then(session => {
-            session.sendRealtimeInput({ media: { mimeType: "text/plain", data: btoa(text) } });
-        }).catch(() => {});
+        // sessionPromiseRef.current.then(session => {
+        //     session.sendRealtimeInput({ media: { mimeType: "text/plain", data: btoa(text) } });
+        // }).catch(() => {});
     }
   }, [feedback, isConnected, isActive, lessonDescription]);
 
