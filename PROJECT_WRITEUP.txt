@@ -1,0 +1,52 @@
+PROJECT WRITEUP: Signify
+
+PROJECT NAME: Signify - Your Personal AI-Powered ASL Tutor
+
+OVERVIEW:
+Signify is an innovative, gamified education platform designed to make learning American Sign Language (ASL) accessible, interactive, and effective. By leveraging advanced webcam-based hand tracking and state-of-the-art AI, Signify provides a "Live Tutor" experience that watches you sign and offers instant, personalized corrections—just like a real teacher.
+
+KEY FEATURES:
+
+1.  📷 Real-Time Hand Tracking
+    -   Utilizes **Google MediaPipe** to defect 21 distinct landmarks on your hands directly in the browser (client-side).
+    -   Privacy-focused: Video feeds are processed locally or sent securely only when active AI feedback is requested.
+
+2.  🤖 AI-Powered Live Tutor
+    -   **Real-Time Feedback**: Powered by **Google Gemini 2.5 Flash Native**, the system analyzes video frames of your hands.
+    -   **Correction Engine**: Detects errors in form (e.g., "Thumb correction needed") and provides specific, actionable advice.
+    -   **Interactive Voice**: The AI speaks to you using synthesized speech (Zephyr voice), guiding you through lessons with encouragement.
+
+3.  📚 Smart Curriculum & Custom Lessons
+    -   **Static Lessons**: Master the basics with A-Z alphabet tutorials.
+    -   **Dynamic Phrases**: Learn complex words like "Hello", utilizing motion tracking algorithms.
+    -   **AI Generator**: Type *any* word or phrase, and the system instantly generates a custom lesson plan using Generative AI.
+
+4.  🔥 Gamification
+    -   Daily Streak tracking to build momentum.
+    -   Quota Tracker: Visualizes your daily API usage to keep learning sustainable.
+    -   Progress badges and unlockable achievements.
+
+5.  🎨 Modern Aesthetic
+    -   Designed with a "Glassmorphism" UI using **Tailwind CSS**.
+    -   Features smooth Framer Motion animations and a sleek dark mode.
+
+TECHNOLOGY STACK:
+-   **Frontend**: React 18, Vite, TypeScript
+-   **AI & Computer Vision**:
+    -   Google Gemini 2.5 Flash Native (Multimodal Live API)
+    -   Google MediaPipe (Hand Landmarker)
+-   **Backend**: Firebase (Authentication, Firestore Database)
+-   **Styling**: Tailwind CSS
+-   **Deployment**: Vercel
+
+RECENT ENGINEERING HIGHLIGHTS:
+-   **Live Session Optimization**: Implemented highly efficient video streaming (1 FPS) to Gemini Live to minimize latency and cost while maintaining accuracy.
+-   **Robust API Handling**: Custom "Universal Key Access" ensuring seamless operation across local, production, and varied environment configurations.
+-   **Stability Fixes**: Resolved critical runtime crashes in the Live Session module for a smooth user experience.
+
+HOW IT WORKS:
+1.  **Select a Lesson**: Choose a letter or phrase.
+2.  **Enable AI Tutor**: Grant camera access.
+3.  **Perform the Sign**: The app tracks your hand skeleton in real-time.
+4.  **Get Feedback**: The AI compares your gesture to the correct sign and speaks corrections (e.g., "Rotate your palm outward").
+5.  **Succeed**: Once correct, the system validates your move and advances your streak!
