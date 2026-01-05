@@ -146,10 +146,12 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
   }
 };
 
-export const generateSpeech = async (text: string): Promise<string | null> => {
+export const generateSpeech = async (text: string, apiKeyOverride?: string): Promise<string | null> => {
     incrementQuota();
     try {
-        const ai = new GoogleGenAI({ apiKey: getApiKey() });
+        const key = apiKeyOverride || getApiKey();
+        if (!key) throw new Error("API Key not found");
+        const ai = new GoogleGenAI({ apiKey: key });
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash-preview-tts",
           contents: [{ parts: [{ text }] }],

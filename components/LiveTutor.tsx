@@ -138,22 +138,29 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
       inputContextRef.current = inputCtx;
       outputContextRef.current = outputCtx;
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 16000
+        }
+      });
       
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: `You are "Signify", a friendly and encouraging ASL tutor. 
+          systemInstruction: `You are "Signify", a strict but encouraging ASL Coach.
           The user is currently learning the sign for: "${lessonSign}".
           Description: "${lessonDescription}".
           
-          ALWAYS GUIDING RULES:
-          1. When the session starts, briefly introduce the sign and how to do it.
-          2. Use the provided video frames to see the user's hands.
-          3. Be concise. Don't talk over the user for too long.
-          4. Provide real-time corrective feedback based on what you see in the video frames.
-          5. If the user succeeds, give them a warm compliment!`,
+          CORE PROTOCOL:
+          1. MONITOR VISUALS: Constantly check the video frames. If the hand is not visible or unclear, IMMEDIATELY ask the user to adjust their position. Do not guess.
+          2. CONCISE FEEDBACK: Keep your responses short (1-2 sentences maximum).
+          3. CORRECTIVE FOCUS: If the sign is wrong, explain strictly what to fix (e.g., "Flatten your palm", "Thumb must touch index").
+          4. VALIDATION: If the sign is correct, confirm it clearly and enthusiastically.
+          5. NO HALLUCINATIONS: Do not claim to see things that aren't there. If the screen is black or empty, say "I cannot see your hand."`,
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
           },
@@ -167,7 +174,8 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             // Proactive Intro: Use standard TTS for reliable initial greeting
             try {
                 const text = `Hi! I'm your tutor. Let's practice the sign for "${lessonSign}". ${lessonDescription}. Show me your hand when you're ready!`;
-                const audioBase64 = await generateSpeech(text);
+                // Pass the locally working key to ensure TTS generation works
+                const audioBase64 = await generateSpeech(text, getApiKey());
                 if (audioBase64 && outputContextRef.current) {
                     setIsSpeaking(true);
                     const ctx = outputContextRef.current;
