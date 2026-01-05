@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, AlertCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { loginWithEmail, registerWithEmail } from '../services/firebaseService';
 import { UserData } from '../types';
+import SplitText from './SplitText';
 
 // REPLACE THIS WITH YOUR UPLOADED CAT IMAGE URL/PATH
 const HERO_IMAGE_URL = "/login_cat.png";
@@ -190,6 +191,44 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
                 {/* Glow behind the cat */}
                 <div className="absolute bottom-0 right-0 w-[80%] h-[80%] bg-gradient-to-t from-blue-500/5 to-transparent blur-3xl z-10" />
+
+                {/* Marketing Text Sequence */}
+                <div className="absolute top-32 left-16 z-30 max-w-xl">
+                    <SplitText
+                        text="Hello There"
+                        className="text-6xl font-black text-white mb-6 uppercase tracking-tighter"
+                        delay={30}
+                        duration={0.6}
+                        
+                    />
+                    <SplitText
+                        text="Welcome to Signify"
+                        className="text-4xl font-bold text-white/80 mb-4"
+                        delay={20}
+                        duration={0.6}
+                        rootMargin="-50px"
+                    />
+                     <div className="mt-8 space-y-3">
+                        <SplitText
+                            text="The master platform for Sign Language"
+                            className="text-xl font-medium text-zinc-400"
+                            delay={15}
+                            duration={0.5}
+                        />
+                        <SplitText
+                            text="Experience real-time AI feedback on your gestures."
+                            className="text-lg text-zinc-500 block"
+                            delay={10}
+                            duration={0.5}
+                        />
+                        <SplitText
+                            text="Learn at your own pace, anytime, anywhere."
+                            className="text-lg text-zinc-500 block"
+                            delay={10}
+                            duration={0.5}
+                        />
+                     </div>
+                </div>
 
                 {/* Cat Image Anchored to Bottom Right */}
                 <motion.img
