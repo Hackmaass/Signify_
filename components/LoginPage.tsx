@@ -4,6 +4,7 @@ import { Loader2, AlertCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { loginWithEmail, registerWithEmail } from '../services/firebaseService';
 import { UserData } from '../types';
 import SplitText from './SplitText';
+import ClickSpark from './ClickSpark';
 
 // REPLACE THIS WITH YOUR UPLOADED CAT IMAGE URL/PATH
 const HERO_IMAGE_URL = "/login_cat.png";
@@ -148,22 +149,30 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                         </AnimatePresence>
 
                         <div className="pt-4">
-                            <motion.button
-                                type="submit"
-                                disabled={isLoading}
-                                whileHover={{ scale: 1.01 }}
-                                whileTap={{ scale: 0.99 }}
-                                className="w-full bg-[#0071e3] hover:bg-[#0077ED] text-white font-semibold text-[17px] py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(0,113,227,0.3)] hover:shadow-[0_0_30px_rgba(0,113,227,0.5)] flex items-center justify-center gap-2 disabled:opacity-70 disabled:pointer-events-none"
+                            <ClickSpark
+                                sparkColor="#fff"
+                                sparkSize={12}
+                                sparkRadius={25}
+                                sparkCount={10}
+                                duration={500}
                             >
-                                {isLoading ? (
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                ) : (
-                                    <>
-                                        <span>{isSignUp ? "Get Started" : "Sign In"}</span>
-                                        <ArrowRight className="w-5 h-5" />
-                                    </>
-                                )}
-                            </motion.button>
+                                <motion.button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    whileHover={{ scale: 1.01 }}
+                                    whileTap={{ scale: 0.99 }}
+                                    className="w-full bg-[#0071e3] hover:bg-[#0077ED] text-white font-semibold text-[17px] py-4 rounded-2xl transition-all shadow-[0_0_20px_rgba(0,113,227,0.3)] hover:shadow-[0_0_30px_rgba(0,113,227,0.5)] flex items-center justify-center gap-2 disabled:opacity-70 disabled:pointer-events-none"
+                                >
+                                    {isLoading ? (
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                    ) : (
+                                        <>
+                                            <span>{isSignUp ? "Get Started" : "Sign In"}</span>
+                                            <ArrowRight className="w-5 h-5" />
+                                        </>
+                                    )}
+                                </motion.button>
+                            </ClickSpark>
                         </div>
                     </form>
 
@@ -193,17 +202,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <div className="absolute bottom-0 right-0 w-[80%] h-[80%] bg-gradient-to-t from-blue-500/5 to-transparent blur-3xl z-10" />
 
                 {/* Marketing Text Sequence */}
-                <div className="absolute top-32 left-16 z-30 max-w-xl">
+                <div className="absolute top-32 left-14 z-30 max-w-xl font-sans">
                     <SplitText
                         text="Hello There"
-                        className="text-6xl font-black text-white mb-6 uppercase tracking-tighter"
+                        className="text-6xl font-bold text-white mb-6"
                         delay={30}
                         duration={0.6}
                         
                     />
                     <SplitText
                         text="Welcome to Signify"
-                        className="text-4xl font-bold text-white/80 mb-4"
+                        className="text-4xl font-semibold text-white/80 mb-4"
                         delay={20}
                         duration={0.6}
                         rootMargin="-50px"
