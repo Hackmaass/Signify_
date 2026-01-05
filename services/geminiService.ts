@@ -1,5 +1,6 @@
-﻿import { FeedbackResponse, Lesson } from '../types';
-import { GoogleGenAI } from "@google/genai";
+﻿
+import { FeedbackResponse, Lesson } from '../types';
+import { GoogleGenAI, Modality } from "@google/genai";
 
 // QUOTA TRACKING CONSTANTS
 const QUOTA_KEY = 'signify_quota_usage';
@@ -31,10 +32,11 @@ export const evaluateHandSign = async (
 ): Promise<FeedbackResponse> => {
   incrementQuota();
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpeg);base64,/, "");
 
     const prompt = `
+      Act as a strict ASL Instructor. 
       The user is attempting to perform the sign for: "${targetSign}".
       Sign Type: ${signType.toUpperCase()}.
       Expected Visual Description: "${targetDescription}".
@@ -77,7 +79,7 @@ export const evaluateHandSign = async (
 export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> => {
   incrementQuota();
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `
       Convert the sentence "${sentence}" into a sequence of ASL signs.
       Return a JSON array of objects:
@@ -127,12 +129,13 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
 export const generateSpeech = async (text: string): Promise<string | null> => {
     incrementQuota();
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash-preview-tts",
           contents: [{ parts: [{ text }] }],
           config: {
-            responseModalities: ["AUDIO" as any],
+            // Corrected: Use Modality.AUDIO instead of string literal
+            responseModalities: [Modality.AUDIO],
             speechConfig: {
                 voiceConfig: {
                   prebuiltVoiceConfig: { voiceName: 'Kore' },

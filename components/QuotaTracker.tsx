@@ -22,7 +22,7 @@ const QuotaTracker: React.FC = () => {
   if (percentage > 70) colorClass = 'bg-amber-500';
   if (percentage > 90) colorClass = 'bg-red-500';
 
-  return (
+  return (  
     <div className="glass-panel p-5 rounded-3xl border border-zinc-200 dark:border-white/10">
         <div className="flex items-center gap-3 mb-3">
             <div className={`p-2 rounded-lg ${colorClass} bg-opacity-10`}>

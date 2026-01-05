@@ -21,6 +21,7 @@ export interface Lesson {
   instruction?: string; // Step-by-step for complex signs
   imageUrl: string;
   difficulty: 'Easy' | 'Medium' | 'Hard';
+  visualGuide?: 'none' | 'motion_circle' | 'motion_shake' | 'motion_forward' | 'motion_up' | 'motion_nod';
 }
 
 export interface FeedbackResponse {

@@ -29,7 +29,7 @@ function createBlob(data: Float32Array): { data: string; mimeType: string } {
   const l = data.length;
   const int16 = new Int16Array(l);
   for (let i = 0; i < l; i++) {
-    // PCM 16-bit encoding
+    // PCM 16-bit encoding: clip and scale
     int16[i] = Math.max(-32768, Math.min(32767, data[i] * 32768));
   }
   const uint8 = new Uint8Array(int16.buffer);
@@ -65,10 +65,12 @@ interface LiveTutorProps {
   triggerIntro?: boolean;
 }
 
-export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, feedback }: LiveTutorProps) {
-  const [isActive, setIsActive] = useState(false);
+export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, feedback, triggerIntro }: LiveTutorProps) {
+  // AI Tutor is now ON by default
+  const [isActive, setIsActive] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const activeRef = useRef(false);
@@ -81,6 +83,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
   const disconnect = () => {
     activeRef.current = false;
     setIsConnected(false);
+    setIsSpeaking(false);
     if (videoIntervalRef.current) clearInterval(videoIntervalRef.current);
     
     if (sessionPromiseRef.current) {
@@ -101,11 +104,13 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
   };
 
   const connect = async () => {
+    if (activeRef.current && isConnected) return;
     activeRef.current = true;
     setError(null);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      // Create fresh instance right before call
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
@@ -118,7 +123,16 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: `You are "Signify", an expert ASL tutor. Currently teaching: ${lessonSign}. Description: ${lessonDescription}. Be encouraging, warm, and concise. Congratulate the user if they succeed.`,
+          systemInstruction: `You are "Signify", a friendly and encouraging ASL tutor. 
+          The user is currently learning the sign for: "${lessonSign}".
+          Description: "${lessonDescription}".
+          
+          ALWAYS GUIDING RULES:
+          1. When the session starts, briefly introduce the sign and how to do it.
+          2. Use the provided video frames to see the user's hands.
+          3. Be concise. Don't talk over the user for too long.
+          4. Provide real-time corrective feedback based on what you see in the video frames.
+          5. If the user succeeds, give them a warm compliment!`,
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
           },
@@ -128,10 +142,16 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             console.log('Live Session Opened');
             setIsConnected(true);
             setError(null);
+            
+            // Proactive Intro: Send initial guidance once connected
+            sessionPromise.then(session => {
+              (session as any).send([{ text: `Hi! I'm your tutor. Let's practice the sign for "${lessonSign}". ${lessonDescription}. Show me your hand when you're ready!` }]);
+            });
           },
           onmessage: async (msg: LiveServerMessage) => {
             const audioBase64 = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
             if (audioBase64 && outputContextRef.current) {
+                setIsSpeaking(true);
                 const ctx = outputContextRef.current;
                 const buffer = await decodeAudioData(decode(audioBase64), ctx);
                 const source = ctx.createBufferSource();
@@ -140,15 +160,23 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
                 nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
                 source.start(nextStartTimeRef.current);
                 nextStartTimeRef.current += buffer.duration;
+                
+                // Track speaking state end
+                source.onended = () => {
+                  if (ctx.currentTime >= nextStartTimeRef.current - 0.1) {
+                    setIsSpeaking(false);
+                  }
+                };
             }
             if (msg.serverContent?.interrupted) {
-               // Handle interruption if necessary (stop current playback)
                nextStartTimeRef.current = 0;
+               setIsSpeaking(false);
             }
           },
           onclose: (e) => {
             console.log('Live Session Closed', e);
             setIsConnected(false);
+            setIsSpeaking(false);
             if (activeRef.current) setError("Session Ended");
           },
           onerror: (err) => {
@@ -161,7 +189,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
 
       sessionPromiseRef.current = sessionPromise;
 
-      // Audio Capture Loop
+      // Audio Capture Loop (Input to Model)
       const source = inputCtx.createMediaStreamSource(stream);
       const processor = inputCtx.createScriptProcessor(4096, 1, 1);
       processor.onaudioprocess = (e) => {
@@ -177,7 +205,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
       source.connect(processor);
       processor.connect(inputCtx.destination);
 
-      // Video Frame Loop
+      // Video Frame Loop (Eyes for the Model)
       videoIntervalRef.current = window.setInterval(() => {
         if (!activeRef.current || !isConnected) return;
         const snapshot = canvasRef.current?.getSnapshot();
@@ -208,21 +236,26 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
     }
   };
 
+  // Start connecting immediately on mount
   useEffect(() => {
+    if (isActive) {
+      connect();
+    }
     return () => disconnect();
   }, []);
 
+  // Proactive Guidance: Respond to automated assessment feedback
   useEffect(() => {
     if (isActive && isConnected && feedback && sessionPromiseRef.current) {
         const text = feedback.isCorrect 
-            ? "The user successfully performed the sign. Congratulate them!" 
-            : `The user needs help with the sign. Feedback: ${feedback.feedback}. Guide them.`;
+            ? `The automated system just verified their sign was correct with a score of ${feedback.score}%. Give them a big enthusiastic congratulations!` 
+            : `The automated system noticed an issue: ${feedback.feedback}. Politely guide them on how to fix it based on the description: ${lessonDescription}.`;
         
         sessionPromiseRef.current.then(session => {
-            session.send([{ text }], true);
+            (session as any).send([{ text }]);
         }).catch(() => {});
     }
-  }, [feedback]);
+  }, [feedback, isConnected, isActive, lessonDescription]);
 
   return (
     <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
@@ -236,48 +269,69 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
             className="flex items-center gap-3 px-6 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-full shadow-2xl transition-all"
           >
             <Sparkles className="w-5 h-5 text-blue-500" />
-            <span className="font-bold text-sm">AI Tutor</span>
+            <span className="font-bold text-sm">Enable AI Tutor</span>
           </motion.button>
         ) : (
           <motion.div 
             key="active"
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className={`backdrop-blur-xl border rounded-full flex items-center justify-between px-4 py-2 min-w-[280px] shadow-2xl ${error ? 'bg-red-500/10 border-red-500/50' : 'bg-white/90 dark:bg-zinc-900/90 border-zinc-200 dark:border-white/10'}`}
+            className={`backdrop-blur-xl border rounded-full flex items-center justify-between px-4 py-2 min-w-[320px] shadow-2xl transition-all ${error ? 'bg-red-500/10 border-red-500/50' : 'bg-white/90 dark:bg-zinc-900/95 border-zinc-200 dark:border-white/10'}`}
           >
-            <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center">
-                    {isConnected ? (
-                        <div className="flex items-center gap-0.5 h-3">
-                            {[0, 1, 2].map((i) => (
-                                <motion.div 
-                                    key={i} 
-                                    animate={{ height: [4, 12, 4] }} 
-                                    transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.1 }}
-                                    className="w-1 bg-blue-500 rounded-full" 
-                                />
-                            ))}
-                        </div>
-                    ) : <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />}
+            <div className="flex items-center gap-4 flex-1">
+                <div className="relative flex items-center justify-center w-10 h-10">
+                    <AnimatePresence>
+                        {isConnected && isSpeaking ? (
+                            <motion.div 
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1.2, opacity: 0.2 }}
+                                exit={{ scale: 0.8, opacity: 0 }}
+                                className="absolute inset-0 bg-blue-500 rounded-full blur-md"
+                            />
+                        ) : null}
+                    </AnimatePresence>
+                    <div className="flex items-center justify-center relative z-10">
+                        {isConnected ? (
+                            <div className="flex items-center gap-0.5 h-4">
+                                {[0, 1, 2, 3, 4].map((i) => (
+                                    <motion.div 
+                                        key={i} 
+                                        animate={{ 
+                                            height: isSpeaking ? [4, 16, 4] : [4, 6, 4],
+                                            opacity: isSpeaking ? 1 : 0.5 
+                                        }} 
+                                        transition={{ 
+                                            duration: isSpeaking ? 0.4 : 1, 
+                                            repeat: Infinity, 
+                                            delay: i * 0.1 
+                                        }}
+                                        className="w-1 bg-blue-500 rounded-full" 
+                                    />
+                                ))}
+                            </div>
+                        ) : <Loader2 className="w-5 h-5 animate-spin text-zinc-400" />}
+                    </div>
                 </div>
                 <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                        {error ? "Error" : (isConnected ? "Live Tutor" : "Connecting...")}
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                        {error ? "System Error" : (isConnected ? (isSpeaking ? "Speaking" : "Listening") : "Initializing")}
                     </span>
-                    <span className="text-xs font-semibold truncate max-w-[120px]">
-                        {error || (isConnected ? "Listening..." : "Initializing...")}
+                    <span className="text-xs font-bold text-zinc-900 dark:text-white truncate max-w-[150px]">
+                        {error || (isConnected ? "Signify ASL Tutor" : "Connecting...")}
                     </span>
                 </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 border-l border-zinc-200 dark:border-white/10 pl-2 ml-2">
                 <button 
                   onClick={() => setIsMuted(!isMuted)} 
+                  title={isMuted ? "Unmute" : "Mute"}
                   className={`p-2 rounded-full transition-colors ${isMuted ? 'text-red-500 bg-red-500/10' : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/10'}`}
                 >
                     {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                 </button>
                 <button 
                   onClick={toggleActive} 
+                  title="Close Tutor"
                   className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-500/10 rounded-full transition-colors"
                 >
                     <StopCircle className="w-4 h-4" />
