@@ -15,6 +15,7 @@ import ProfileMenu from './components/ProfileMenu';
 import Dock from './components/Dock';
 import { Play, LogOut, Home, Activity, Moon, Sun, BookOpen, LogIn, Loader2, Sparkles, Wand2, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import Footer from './components/Footer';
 
 // --- DATA DEFINITIONS ---
 
@@ -417,6 +418,7 @@ export default function App() {
                     </div>
                 )}
             </AnimatePresence>
+        <Footer />
         </LayoutGroup>
     </div>
   );

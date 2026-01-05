@@ -183,7 +183,7 @@ const DynamicBackgroundText: React.FC<DynamicBackgroundTextProps> = ({
   return (
     <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
       <motion.div
-        className="absolute inset-0 flex items-center justify-center"
+        className="absolute inset-0 flex items-center justify-center pb-32"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
