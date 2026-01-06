@@ -78,7 +78,7 @@ Signify is built on a robust foundation of Google's cutting-edge tools:
     Create a `.env` file (or set in Vercel):
 
     ```env
-    API_KEY=your_gemini_key_here
+    VITE_GEMINI_API_KEY=your_gemini_key_here
     ```
 
 4.  **Run Locally**
@@ -93,7 +93,7 @@ This project is optimized for **Vercel**.
 
 1.  Push your code to GitHub.
 2.  Import the repo into Vercel.
-3.  Add your `API_KEY` to Vercel Environment Variables.
+3.  Add your `VITE_GEMINI_API_KEY` to Vercel Environment Variables.
 4.  **Important**: Add your Vercel domain to the **Authorized Domains** list in your Firebase Console authentication settings.
 
 ## 🤝 Contributing

@@ -32,7 +32,7 @@ export const evaluateHandSign = async (
 ): Promise<FeedbackResponse> => {
   incrementQuota();
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
     const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpeg);base64,/, "");
 
     const prompt = `
@@ -79,7 +79,7 @@ export const evaluateHandSign = async (
 export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> => {
   incrementQuota();
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
     const prompt = `
       Convert the sentence "${sentence}" into a sequence of ASL signs.
       Return a JSON array of objects:
@@ -129,7 +129,7 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
 export const generateSpeech = async (text: string): Promise<string | null> => {
     incrementQuota();
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash-preview-tts",
           contents: [{ parts: [{ text }] }],

@@ -13,20 +13,20 @@ Since your project is a Vite-based React application, deploying to Vercel is str
 1.  **Log in to Vercel** and go to your **Dashboard**.
 2.  Click **"Add New..."** -> **"Project"**.
 3.  **Import Git Repository**:
-    *   Find `Signify_` in the list (you might need to adjust permissions if it's not visible).
-    *   Click **Import**.
+    - Find `Signify_` in the list (you might need to adjust permissions if it's not visible).
+    - Click **Import**.
 4.  **Configure Project**:
-    *   **Framework Preset**: It should auto-detect **Vite**. If not, select it.
-    *   **Root Directory**: Leave as `./` (default).
-    *   **Build Command**: `vite build` (default).
-    *   **Output Directory**: `dist` (default).
-    *   **Install Command**: `npm install` (default).
+    - **Framework Preset**: It should auto-detect **Vite**. If not, select it.
+    - **Root Directory**: Leave as `./` (default).
+    - **Build Command**: `vite build` (default).
+    - **Output Directory**: `dist` (default).
+    - **Install Command**: `npm install` (default).
 5.  **Environment Variables** (Crucial!):
-    *   Expand the **Environment Variables** section.
-    *   Add the following variable:
-        *   **Key**: `GEMINI_API_KEY` (or `VITE_GEMINI_API_KEY` if you changed the code to check that too, but our code checks `process.env.API_KEY` which Vite maps from `GEMINI_API_KEY` in `vite.config.ts`)
-        *   **Value**: `AIzaSyA1VgyddwDbwScM8Sxp13dRaK7G66L3eKw`
-    *   *Note: In `vite.config.ts`, we mapped `process.env.API_KEY` to `env.GEMINI_API_KEY`, so setting `GEMINI_API_KEY` in Vercel is the correct action.*
+    - Expand the **Environment Variables** section.
+    - Add the following variable:
+      - **Key**: `VITE_GEMINI_API_KEY`
+      - **Value**: `AIzaSyA1VgyddwDbwScM8Sxp13dRaK7G66L3eKw`
+    - _Note: Ensure `VITE_GEMINI_API_KEY` is set in Vercel._
 6.  Click **Deploy**.
 
 ## Post-Deployment
@@ -34,8 +34,8 @@ Since your project is a Vite-based React application, deploying to Vercel is str
 - Vercel will build your project. If successful, you'll get a production URL (e.g., `https://signify-app.vercel.app`).
 - **Test the App**: Open the URL, grant camera/microphone permissions, and try the Live Tutor.
 - **Firebase Auth Domains**:
-    *   Go to your **Firebase Console** -> **Authentication** -> **Settings** -> **Authorized Domains**.
-    *   Add your new Vercel domain (e.g., `signify-app.vercel.app`) to the list. This allows Google Sign-In to work.
+  - Go to your **Firebase Console** -> **Authentication** -> **Settings** -> **Authorized Domains**.
+  - Add your new Vercel domain (e.g., `signify-app.vercel.app`) to the list. This allows Google Sign-In to work.
 
 ## Troubleshooting
 
