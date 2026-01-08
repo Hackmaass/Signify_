@@ -54,19 +54,19 @@ Signify bridges this gap by using **Google MediaPipe** for real-time hand tracki
 
 ```mermaid
 flowchart TD
-    User[User Webcam] -->|Video Feed| Client[Client Browser]
-    Client -->|Local Processing| MediaPipe[MediaPipe Hands]
-    MediaPipe -->|21 3D Landmarks| LandmarkProcess[Data Formatting]
+    User["User Webcam"] -->|Video Feed| Client["Client Browser"]
+    Client -->|Local Processing| MediaPipe["MediaPipe Hands"]
+    MediaPipe -->|21 3D Landmarks| LandmarkProcess["Data Formatting"]
 
-    subgraph Google Cloud & AI
-        LandmarkProcess -->|JSON Data| GeminiVision[Gemini 3 Flash (Vision)]
-        GeminiVision -->|Feedback Text| GeminiTTS[Gemini 2.5 Flash (TTS)]
+    subgraph GoogleCloudAI ["Google Cloud & AI"]
+        LandmarkProcess -->|JSON Data| GeminiVision["Gemini 3 Flash (Vision)"]
+        GeminiVision -->|Feedback Text| GeminiTTS["Gemini 2.5 Flash (TTS)"]
         GeminiTTS -->|Audio| Client
     end
 
-    subgraph Backend Services
-        Client -->|Auth| FirebaseAuth[Firebase Auth]
-        Client -->|Stats & Streaks| Firestore[Cloud Firestore]
+    subgraph BackendServices ["Backend Services"]
+        Client -->|Auth| FirebaseAuth["Firebase Auth"]
+        Client -->|Stats & Streaks| Firestore["Cloud Firestore"]
     end
 
     GeminiVision -->|Lesson Content| Client
@@ -189,10 +189,6 @@ Contributions are welcome! Please open an issue or submit a pull request.
 5. Open a Pull Request.
 
 ---
-
-## 📜 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
 
 <p align="center">
   <i>Built with ❤️ for Cyberathon</i>
