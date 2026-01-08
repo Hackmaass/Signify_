@@ -191,5 +191,5 @@ Contributions are welcome! Please open an issue or submit a pull request.
 ---
 
 <p align="center">
-  <i>Built with for Cyberathon</i>
+  <i>Built for Cyberathon</i>
 </p>
