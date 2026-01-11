@@ -110,8 +110,13 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
     setError(null);
 
     try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("Gemini API Key is missing. Please check your .env file and ensure VITE_GEMINI_API_KEY is set.");
+      }
+      
       // Create fresh instance right before call
-      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey });
       
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
@@ -223,7 +228,7 @@ export default function LiveTutor({ lessonSign, lessonDescription, canvasRef, fe
 
     } catch (e: any) {
       console.error("Live Tutor Initialization Failed", e);
-      setError("Failed to start session");
+      setError(e.message || "Failed to start session");
       disconnect();
     }
   };

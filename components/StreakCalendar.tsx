@@ -1,10 +1,12 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { UserData } from '../types';
 import { Flame, Quote, CalendarCheck, Trophy, Zap, TrendingUp, Target, Award, Star } from 'lucide-react';
-import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
+import ProgressPieChart from './ProgressPieChart';
 
 interface Props {
   user: UserData;
+  showChart: boolean;
 }
 
 const QUOTES = [
@@ -17,7 +19,7 @@ const QUOTES = [
   "Expertise is just practice standardized."
 ];
 
-const StreakCalendar: React.FC<Props> = ({ user }) => {
+const StreakCalendar: React.FC<Props> = ({ user, showChart }) => {
   const [quote, setQuote] = useState('');
   const [mounted, setMounted] = useState(false);
   const [hoveredDay, setHoveredDay] = useState<string | null>(null);
@@ -35,56 +37,40 @@ const StreakCalendar: React.FC<Props> = ({ user }) => {
   }, [user.history]);
 
   const longestStreak = useMemo(() => {
-    let maxStreak = 0;
-    let currentStreak = 0;
+    let max = 0, curr = 0;
     const sortedDates = Object.keys(user.history).sort();
-    
     for (const date of sortedDates) {
-      if (user.history[date]) {
-        currentStreak++;
-        maxStreak = Math.max(maxStreak, currentStreak);
-      } else {
-        currentStreak = 0;
-      }
+      if (user.history[date]) { curr++; max = Math.max(max, curr); } else curr = 0;
     }
-    return maxStreak;
+    return max;
   }, [user.history]);
 
   const completionRate = useMemo(() => {
     return Math.round((activeDays / 84) * 100); // 12 weeks = 84 days
   }, [activeDays]);
 
-  // Generate the last 12 weeks for a cleaner look
   const calendarData = useMemo(() => {
     const today = new Date();
     const weeks = 12;
     const days = weeks * 7;
     const data = [];
-
-    // Start from 'days' ago
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(today.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
-      data.push({
-        date: d,
-        dateStr,
-        active: !!user.history[dateStr]
-      });
+      data.push({ date: d, dateStr, active: !!user.history[dateStr] });
     }
     return data;
   }, [user.history]);
 
   const weeks = useMemo(() => {
     const w = [];
-    for (let i = 0; i < calendarData.length; i += 7) {
-      w.push(calendarData.slice(i, i + 7));
-    }
+    for (let i = 0; i < calendarData.length; i += 7) w.push(calendarData.slice(i, i + 7));
     return w;
   }, [calendarData]);
 
   return (
-    <motion.div 
+    <motion.div
       className="relative w-full max-w-md group"
       onMouseMove={(e) => {
         mouseX.set(e.clientX);
@@ -97,7 +83,7 @@ const StreakCalendar: React.FC<Props> = ({ user }) => {
         {/* Base Glass Panel */}
         <div className="absolute inset-0 glass-panel border border-zinc-200/50 dark:border-white/10 group-hover:border-zinc-300 dark:group-hover:border-white/20 transition-all duration-500 shadow-2xl dark:shadow-2xl bg-white/70 dark:bg-zinc-900/50 backdrop-blur-2xl" />
 
-        {/* Animated Background Mesh - Adapted for Light/Dark */}
+        {/* Animated Background Mesh */}
         <motion.div
           animate={{
             scale: [1, 1.2, 1],
@@ -118,9 +104,9 @@ const StreakCalendar: React.FC<Props> = ({ user }) => {
         />
       </div>
 
-      {/* Content Layer - NOT CLIPPED (allows tooltips to overflow) */}
+      {/* Content Layer */}
       <div className="relative z-10 p-8">
-        {/* Enhanced Header with Stats */}
+        {/* Enhanced Header with Stats - ALWAYS VISIBLE */}
         <div className="mb-8">
           {/* Main Stats Grid */}
           <div className="grid grid-cols-2 gap-6 mb-6">
@@ -135,7 +121,7 @@ const StreakCalendar: React.FC<Props> = ({ user }) => {
                 <h3 className="text-[10px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-widest">Total Lessons</h3>
               </div>
               <div className="flex items-baseline gap-2">
-                <motion.span 
+                <motion.span
                   className="text-4xl font-black text-zinc-900 dark:text-white tabular-nums"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -150,11 +136,10 @@ const StreakCalendar: React.FC<Props> = ({ user }) => {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.15 }}
-              className={`p-4 rounded-2xl border ${
-                user.streak > 0 
-                  ? 'bg-gradient-to-br from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20 border-amber-500/30 dark:border-amber-500/40' 
-                  : 'bg-zinc-100/50 dark:bg-zinc-800/50 border-zinc-300 dark:border-zinc-700'
-              }`}
+              className={`p-4 rounded-2xl border ${user.streak > 0
+                ? 'bg-gradient-to-br from-amber-500/10 to-orange-500/10 dark:from-amber-500/20 dark:to-orange-500/20 border-amber-500/30 dark:border-amber-500/40'
+                : 'bg-zinc-100/50 dark:bg-zinc-800/50 border-zinc-300 dark:border-zinc-700'
+                }`}
             >
               <div className="flex items-center gap-2 mb-2">
                 {user.streak > 0 ? (
@@ -170,12 +155,11 @@ const StreakCalendar: React.FC<Props> = ({ user }) => {
                 <h3 className="text-[10px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-widest">Current Streak</h3>
               </div>
               <div className="flex items-baseline gap-2">
-                <motion.span 
-                  className={`text-4xl font-black tabular-nums ${
-                    user.streak > 0 
-                      ? 'text-transparent bg-clip-text bg-gradient-to-br from-amber-500 via-orange-500 to-red-600 dark:from-amber-300 dark:via-orange-400 dark:to-red-500' 
-                      : 'text-zinc-400 dark:text-zinc-600'
-                  }`}
+                <motion.span
+                  className={`text-4xl font-black tabular-nums ${user.streak > 0
+                    ? 'text-transparent bg-clip-text bg-gradient-to-br from-amber-500 via-orange-500 to-red-600 dark:from-amber-300 dark:via-orange-400 dark:to-red-500'
+                    : 'text-zinc-400 dark:text-zinc-600'
+                    }`}
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.25, type: "spring" }}
@@ -216,11 +200,11 @@ const StreakCalendar: React.FC<Props> = ({ user }) => {
             </motion.div>
           </div>
 
-          {/* Completion Rate */}
-          {completionRate > 0 && (
+          {!showChart && completionRate > 0 && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ delay: 0.4 }}
               className="mt-4 p-3 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20 border border-purple-500/20"
             >
@@ -240,112 +224,153 @@ const StreakCalendar: React.FC<Props> = ({ user }) => {
           )}
         </div>
 
-        {/* Enhanced Heatmap Grid */}
-        <div className="flex justify-between gap-2 mb-8 relative z-10 px-1">
-          {weeks.map((week, wIdx) => (
-            <div key={wIdx} className="flex flex-col gap-2">
-              {week.map((day, dIdx) => {
-                const isToday = day.dateStr === new Date().toISOString().split('T')[0];
-                return (
-                  <motion.div
-                    key={day.dateStr}
-                    initial={{ scale: 0, opacity: 0, rotate: -180 }}
-                    animate={{ scale: 1, opacity: 1, rotate: 0 }}
-                    whileHover={{ scale: 1.8, zIndex: 50, rotate: 5 }}
-                    onHoverStart={() => setHoveredDay(day.dateStr)}
-                    onHoverEnd={() => setHoveredDay(null)}
-                    transition={{
-                      delay: (wIdx * 7 + dIdx) * 0.003,
-                      type: "spring",
-                      stiffness: 400,
-                      damping: 20
-                    }}
-                    className={`w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-md relative group/day cursor-help transition-all duration-300 ${
-                      day.active
-                        ? 'bg-gradient-to-br from-blue-500 via-cyan-400 to-teal-400 dark:from-blue-600 dark:via-cyan-500 dark:to-teal-500 shadow-lg shadow-blue-500/50 dark:shadow-blue-500/30 ring-2 ring-blue-400/30 dark:ring-blue-400/20'
-                        : isToday
-                        ? 'bg-zinc-400 dark:bg-zinc-600 ring-2 ring-zinc-500/50 dark:ring-zinc-500/30'
-                        : 'bg-zinc-200 dark:bg-white/5 border border-zinc-300 dark:border-white/10 hover:bg-zinc-300 dark:hover:bg-white/10'
-                    }`}
-                  >
-                    {/* Active Day Effects */}
-                    {day.active && (
-                      <>
-                        <motion.div
-                          className="absolute inset-0 bg-white/30 rounded-md"
-                          animate={{
-                            opacity: [0.3, 0.6, 0.3],
-                          }}
-                          transition={{
-                            duration: 2,
-                            repeat: Infinity,
-                            ease: "easeInOut"
-                          }}
-                        />
-                        <motion.div
-                          className="absolute -inset-1 bg-blue-400/20 rounded-md blur-sm"
-                          animate={{
-                            scale: [1, 1.2, 1],
-                            opacity: [0.3, 0.6, 0.3],
-                          }}
-                          transition={{
-                            duration: 3,
-                            repeat: Infinity,
-                            ease: "easeInOut"
-                          }}
-                        />
-                      </>
-                    )}
-                    
-                    {isToday && !day.active && (
-                      <motion.div
-                        className="absolute inset-0 border-2 border-dashed border-zinc-500 dark:border-zinc-400 rounded-md"
-                        animate={{
-                          opacity: [0.5, 1, 0.5],
-                        }}
-                        transition={{
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: "easeInOut"
-                        }}
-                      />
-                    )}
+        {/* Visualization Section: Heatmap OR Pie Chart */}
+        <div className="min-h-[220px] flex items-center justify-center mb-8 relative z-10 w-full">
+          <AnimatePresence mode="wait">
+            {showChart ? (
+              <motion.div
+                key="chart"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.3 }}
+                className="w-full flex flex-col items-center"
+              >
+                <div className="flex items-center justify-center gap-2 mb-4 w-full">
+                  <Trophy className="w-4 h-4 text-purple-500" />
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Mastery Overview</h3>
+                </div>
+                <ProgressPieChart user={user} />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="calendar"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="w-full"
+              >
+                <div className="flex flex-col gap-3">
+                  {/* Top: Month Labels */}
+                  <div className="flex pl-8 relative h-4 select-none">
+                    {weeks.map((week, i) => {
+                      const weekDate = week[0].date;
+                      const prevWeekDate = i > 0 ? weeks[i - 1][0].date : null;
+                      const isNewMonth = i === 0 || (prevWeekDate && weekDate.getMonth() !== prevWeekDate.getMonth());
+                      const monthName = weekDate.toLocaleString('default', { month: 'short' });
 
-                    {/* Enhanced Tooltip */}
-                    <AnimatePresence>
-                      {hoveredDay === day.dateStr && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 5, scale: 0.9 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 5, scale: 0.9 }}
-                          className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-4 py-2.5 bg-white dark:bg-zinc-900/95 backdrop-blur-xl border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white text-xs font-semibold rounded-xl shadow-2xl whitespace-nowrap pointer-events-none flex flex-col items-center z-50"
+                      return isNewMonth ? (
+                        <div
+                          key={i}
+                          className="absolute text-[10px] font-bold text-zinc-400/80 dark:text-zinc-500 uppercase tracking-widest transform -translate-x-2"
+                          style={{ left: `calc(${i * 100}% / ${weeks.length} + 32px)` }}
                         >
-                          <span className="text-zinc-500 dark:text-zinc-400 text-[10px] uppercase tracking-wider mb-1">{day.date.toLocaleDateString(undefined, { weekday: 'long' })}</span>
-                          <span className="text-zinc-900 dark:text-white font-bold">{day.date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</span>
-                          {day.active ? (
-                            <span className="text-emerald-600 dark:text-emerald-400 text-[10px] mt-2 flex items-center gap-1.5 font-bold">
-                              <CalendarCheck className="w-3 h-3" /> Lesson Completed
-                            </span>
-                          ) : isToday ? (
-                            <span className="text-blue-600 dark:text-blue-400 text-[10px] mt-2 flex items-center gap-1.5">
-                              <Star className="w-3 h-3" /> Today
-                            </span>
-                          ) : (
-                            <span className="text-zinc-400 text-[10px] mt-2">No practice</span>
-                          )}
-                          {/* Tooltip Arrow */}
-                          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-white dark:border-t-zinc-900/95"></div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                );
-              })}
-            </div>
-          ))}
+                          {monthName}
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+
+                  {/* Main Grid Section */}
+                  <div className="flex gap-2 relative">
+                    {/* Left: Weekday Labels (All 7 days) */}
+                    <div className="flex flex-col gap-2 pt-[2px] pr-2 select-none h-full justify-between pb-1">
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                        <div key={day} className="h-3 sm:h-3.5 flex items-center justify-end">
+                          <span className="text-[9px] font-bold text-zinc-400/60 dark:text-zinc-600/80 uppercase tracking-normal tabular-nums leading-none">
+                            {day}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Right: Heatmap Columns */}
+                    <div className="flex justify-between gap-2 px-1 flex-1">
+                      {weeks.map((week, wIdx) => (
+                        <div key={wIdx} className="flex flex-col gap-2">
+                          {week.map((day, dIdx) => {
+                            const isToday = day.dateStr === new Date().toISOString().split('T')[0];
+
+                            const getRelativeDate = (date: Date) => {
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+                              date.setHours(0, 0, 0, 0);
+                              const diffTime = today.getTime() - date.getTime();
+                              const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+                              if (diffDays === 0) return 'Today';
+                              if (diffDays === 1) return 'Yesterday';
+                              if (diffDays > 1) return `${diffDays} days ago`;
+                              return '';
+                            };
+
+                            return (
+                              <motion.div
+                                key={day.dateStr}
+                                initial={{ scale: 0, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                whileHover={{ scale: 1.4, zIndex: 50 }}
+                                onHoverStart={() => setHoveredDay(day.dateStr)}
+                                onHoverEnd={() => setHoveredDay(null)}
+                                transition={{
+                                  delay: (wIdx * 7 + dIdx) * 0.002,
+                                  type: "spring",
+                                  stiffness: 400,
+                                  damping: 25
+                                }}
+                                className={`w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-[3px] sm:rounded text-[0px] relative group/day cursor-help transition-all duration-300 ${day.active
+                                  ? 'bg-gradient-to-br from-blue-500 to-cyan-400 dark:from-blue-600 dark:to-cyan-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]'
+                                  : isToday
+                                    ? 'bg-zinc-300 dark:bg-zinc-700 ring-1 ring-zinc-400 dark:ring-zinc-600'
+                                    : 'bg-zinc-100/80 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10'
+                                  }`}
+                              >
+                                {day.active && (
+                                  <div className="absolute inset-0 bg-white/20 rounded-[inherit]" />
+                                )}
+
+                                <AnimatePresence>
+                                  {hoveredDay === day.dateStr && (
+                                    <motion.div
+                                      initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                                      animate={{ opacity: 1, y: -4, scale: 1 }}
+                                      exit={{ opacity: 0, y: 2, scale: 0.9 }}
+                                      className="absolute bottom-full left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+                                    >
+                                      <div className="px-3 py-2 bg-zinc-900/95 dark:bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-white/10 dark:border-zinc-900/10 flex flex-col items-center gap-0.5 whitespace-nowrap min-w-[100px]">
+                                        <div className="flex items-center gap-1.5 mb-0.5">
+                                          <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{day.date.toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                                          <span className="text-[9px] font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-200 dark:bg-zinc-100/10 px-1 py-0.5 rounded">{getRelativeDate(day.date)}</span>
+                                        </div>
+                                        <span className="text-xs font-bold text-white dark:text-zinc-900 leading-none mb-1">{day.date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</span>
+
+                                        {day.active ? (
+                                          <span className="text-[10px] font-bold text-cyan-400 dark:text-blue-600 flex items-center gap-1 mt-1">
+                                            <CalendarCheck className="w-3 h-3" /> Practice Completed
+                                          </span>
+                                        ) : (
+                                          <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 mt-1">No activity recorded</span>
+                                        )}
+                                      </div>
+                                      <div className="w-2 h-2 bg-zinc-900/95 dark:bg-white/95 rotate-45 absolute left-1/2 -translate-x-1/2 -bottom-1" />
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Quote Footer */}
+        {/* Quote Footer - ALWAYS VISIBLE */}
         <AnimatePresence>
           {mounted && (
             <motion.div

@@ -25,14 +25,18 @@ const incrementQuota = () => {
 };
 
 export const evaluateHandSign = async (
-  imageBase64: string, 
+  imageBase64: string,
   targetSign: string,
   targetDescription: string,
   signType: 'static' | 'dynamic' = 'static'
 ): Promise<FeedbackResponse> => {
   incrementQuota();
   try {
-    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("Missing VITE_GEMINI_API_KEY");
+    }
+    const ai = new GoogleGenAI({ apiKey });
     const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpeg);base64,/, "");
 
     const prompt = `
@@ -79,7 +83,11 @@ export const evaluateHandSign = async (
 export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> => {
   incrementQuota();
   try {
-    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("Missing VITE_GEMINI_API_KEY");
+    }
+    const ai = new GoogleGenAI({ apiKey });
     const prompt = `
       Convert the sentence "${sentence}" into a sequence of ASL signs.
       Return a JSON array of objects:
@@ -107,7 +115,7 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
     return rawData.map((item: any, index: number) => {
       let imageUrl = `https://placehold.co/400x400/27272a/FFFFFF/png?text=${encodeURIComponent(item.sign)}&font=roboto`;
       if (item.sign.length === 1 && /^[A-Za-z]$/.test(item.sign)) {
-         imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/Sign_language_${item.sign.toUpperCase()}.svg?width=500`;
+        imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/Sign_language_${item.sign.toUpperCase()}.svg?width=500`;
       }
       return {
         id: `custom-${Date.now()}-${index}`,
@@ -116,7 +124,7 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
         letter: item.sign,
         description: item.description,
         instruction: item.instruction,
-        imageUrl: imageUrl, 
+        imageUrl: imageUrl,
         difficulty: item.difficulty
       };
     });
@@ -127,26 +135,30 @@ export const generateLessonPlan = async (sentence: string): Promise<Lesson[]> =>
 };
 
 export const generateSpeech = async (text: string): Promise<string | null> => {
-    incrementQuota();
-    try {
-        const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash-preview-tts",
-          contents: [{ parts: [{ text }] }],
-          config: {
-            // Corrected: Use Modality.AUDIO instead of string literal
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: 'Kore' },
-                },
-            },
-          },
-        });
-        const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        return audioData || null;
-    } catch (e) {
-        console.error("TTS Generation Error:", e);
-        return null;
+  incrementQuota();
+  try {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("Missing VITE_GEMINI_API_KEY");
     }
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text }] }],
+      config: {
+        // Corrected: Use Modality.AUDIO instead of string literal
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
+          },
+        },
+      },
+    });
+    const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    return audioData || null;
+  } catch (e) {
+    console.error("TTS Generation Error:", e);
+    return null;
+  }
 };
