@@ -167,16 +167,6 @@ flowchart TD
 
 ---
 
-## 👥 Team
-
-| ⚡ Team Daemons      |
-| :------------------- |
-| **Omkar Rane**       |
-| **Saee Kumbhar**     |
-| **Bhavjot Singh**    |
-| **Prathamesh Patil** |
-
----
 
 ## 🤝 Contributing
 
